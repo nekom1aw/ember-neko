@@ -42,6 +42,10 @@ class ExampleTest extends TestCase
             ->assertSee('id="map-detail-close"', false)
             ->assertSee('id="map-drilldown-control"', false)
             ->assertSee('id="map-boundary-breadcrumb"', false)
+            ->assertSee('id="map-status-filter"', false)
+            ->assertSee('data-map-status="high"', false)
+            ->assertSee('data-map-status="unrated"', false)
+            ->assertSee('Pilih semua')
             ->assertSee('Klik provinsi untuk melihat kabupaten/kota.')
             ->assertSee('Buka detail lengkap')
             ->assertSee('h-[calc(100vh-6.5rem)]', false)
@@ -113,9 +117,9 @@ class ExampleTest extends TestCase
     public function test_public_statistics_groups_location_statuses_by_year(): void
     {
         DB::table('titik_lokasi')->insert([
-            ['latitude' => -2.5, 'longitude' => 102.7, 'date' => '2024-02-01', 'confidence' => 'high'],
-            ['latitude' => -2.6, 'longitude' => 102.8, 'date' => '2024-03-01', 'confidence' => 'low'],
-            ['latitude' => -2.7, 'longitude' => 102.9, 'date' => '2025-04-01', 'confidence' => null],
+            ['provinsi' => 'Jambi', 'latitude' => -2.5, 'longitude' => 102.7, 'date' => '2024-02-01', 'confidence' => 'high'],
+            ['provinsi' => 'Jambi', 'latitude' => -2.6, 'longitude' => 102.8, 'date' => '2024-03-01', 'confidence' => 'low'],
+            ['provinsi' => 'Sumatera Selatan', 'latitude' => -2.7, 'longitude' => 102.9, 'date' => '2025-04-01', 'confidence' => null],
         ]);
 
         $this->get(route('user.statistics', ['lang' => 'id']))
@@ -124,7 +128,15 @@ class ExampleTest extends TestCase
             ->assertSee('2024')
             ->assertSee('2025')
             ->assertSee('Tinggi')
-            ->assertSee('Belum dinilai');
+            ->assertSee('Belum dinilai')
+            ->assertSee('Tren per provinsi')
+            ->assertSee('Jambi')
+            ->assertSee('Sumatera Selatan')
+            ->assertSee('data-province-chart', false)
+            ->assertSee('data-province-period', false)
+            ->assertSee('data-province-year', false)
+            ->assertSee('Per bulan')
+            ->assertSee('"monthly":{"2024":[0,1,1', false);
 
         $this->get(route('user.statistics', ['lang' => 'en']))
             ->assertOk()

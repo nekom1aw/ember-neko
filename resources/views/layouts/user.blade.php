@@ -18,10 +18,8 @@
     <header class="sticky top-0 z-[60] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,.04)] backdrop-blur-xl">
         <nav class="mx-auto flex min-h-17 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="{{ $currentLanguage === 'en' ? 'Main navigation' : 'Navigasi utama' }}">
             <a href="{{ route('user.dashboard', ['lang' => $currentLanguage]) }}" class="flex shrink-0 items-center gap-3">
-                <span class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-red-500 to-red-700 text-white shadow-lg shadow-red-600/20 ring-1 ring-red-400/20">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="size-5" aria-hidden="true">
-                        <path d="M12.8 2.5c.4 3-1.1 4.7-2.6 6.2-1.4 1.4-2.7 2.8-2.7 5.3a4.5 4.5 0 0 0 9 0c0-1.5-.6-2.8-1.6-4.1-.1 1.8-.9 2.9-2 3.6.5-3.9-1.3-5.7-.1-11Z"/>
-                    </svg>
+                <span class="relative size-10 shrink-0 overflow-hidden bg-white shadow-lg shadow-red-600/15 ring-1 ring-slate-200">
+                    <img src="{{ asset('images/ember-logo.png') }}" alt="" class="absolute -left-[17px] -top-[10px] size-[74px] max-w-none" aria-hidden="true">
                 </span>
                 <span>
                     <span class="block text-lg font-black leading-none tracking-tight text-slate-950">EMBER</span>
@@ -37,6 +35,8 @@
                     ['user.about', $currentLanguage === 'en' ? 'About' : 'Tentang'],
                     ['user.methodology', $currentLanguage === 'en' ? 'Methodology' : 'Metodologi'],
                     ['user.team', $currentLanguage === 'en' ? 'Team' : 'Tim'],
+                    ['user.activities', $currentLanguage === 'en' ? 'Activities' : 'Aktivitas'],
+                    ['user.faq', 'FAQ'],
                 ] as [$routeName, $label])
                     <a href="{{ route($routeName, ['lang' => $currentLanguage]) }}" class="rounded-lg px-3 py-2 transition {{ request()->routeIs($routeName) ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/70' : 'hover:bg-white/70 hover:text-slate-950' }}">{{ $label }}</a>
                 @endforeach
@@ -67,6 +67,8 @@
                         <a href="{{ route('user.about', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'About' : 'Tentang' }}</a>
                         <a href="{{ route('user.methodology', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Methodology' : 'Metodologi' }}</a>
                         <a href="{{ route('user.team', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Team' : 'Tim' }}</a>
+                        <a href="{{ route('user.activities', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Activities' : 'Aktivitas' }}</a>
+                        <a href="{{ route('user.faq', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">FAQ</a>
                         <div class="mt-2 grid grid-cols-2 border-t border-slate-200 pt-2 text-center text-xs font-bold">
                             <a href="{{ request()->fullUrlWithQuery(['lang' => 'id']) }}" class="px-3 py-2 {{ $currentLanguage === 'id' ? 'bg-slate-900 text-white' : '' }}">ID</a>
                             <a href="{{ request()->fullUrlWithQuery(['lang' => 'en']) }}" class="px-3 py-2 {{ $currentLanguage === 'en' ? 'bg-slate-900 text-white' : '' }}">EN</a>
@@ -101,6 +103,8 @@
                 <a href="{{ route('user.team', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Team' : 'Tim' }}</a>
                 <a href="{{ route('user.map', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Map' : 'Peta' }}</a>
                 <a href="{{ route('user.statistics', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Statistics' : 'Statistik' }}</a>
+                <a href="{{ route('user.activities', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Activities' : 'Aktivitas' }}</a>
+                <a href="{{ route('user.faq', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">FAQ</a>
                 <a href="{{ route('user.search', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Search' : 'Pencarian' }}</a>
             </div>
         </div>

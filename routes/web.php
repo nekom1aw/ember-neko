@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\Cms\AboutController;
+use App\Http\Controllers\Cms\ActivityController;
 use App\Http\Controllers\Cms\AuthController;
+use App\Http\Controllers\Cms\FaqController;
 use App\Http\Controllers\Cms\GeoJsonController;
 use App\Http\Controllers\Cms\LocationController;
 use App\Http\Controllers\Cms\MethodologyController;
@@ -20,6 +22,9 @@ Route::get('/search', [ContentController::class, 'search'])->name('user.search')
 Route::get('/about', [ContentController::class, 'about'])->name('user.about');
 Route::get('/team', [ContentController::class, 'team'])->name('user.team');
 Route::get('/methodology', [ContentController::class, 'methodology'])->name('user.methodology');
+Route::get('/faq', [ContentController::class, 'faq'])->name('user.faq');
+Route::get('/activities', [ContentController::class, 'activities'])->name('user.activities');
+Route::get('/activities/{id}', [ContentController::class, 'activity'])->name('user.activities.show');
 Route::get('/map-layers/{id}', [GeoJsonController::class, 'show'])->name('map-layers.show');
 
 Route::prefix('cms')->name('cms.')->group(function () {
@@ -43,6 +48,19 @@ Route::prefix('cms')->name('cms.')->group(function () {
         Route::get('/team', [TeamController::class, 'index'])->name('team.index');
         Route::post('/team', [TeamController::class, 'store'])->name('team.store');
         Route::delete('/team/{id}', [TeamController::class, 'destroy'])->name('team.destroy');
+
+        Route::get('/faq', [FaqController::class, 'index'])->name('faq.index');
+        Route::post('/faq', [FaqController::class, 'store'])->name('faq.store');
+        Route::get('/faq/{id}/edit', [FaqController::class, 'edit'])->name('faq.edit');
+        Route::put('/faq/{id}', [FaqController::class, 'update'])->name('faq.update');
+        Route::delete('/faq/{id}', [FaqController::class, 'destroy'])->name('faq.destroy');
+
+        Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+        Route::get('/activities/create', [ActivityController::class, 'create'])->name('activities.create');
+        Route::post('/activities', [ActivityController::class, 'store'])->name('activities.store');
+        Route::get('/activities/{id}/edit', [ActivityController::class, 'edit'])->name('activities.edit');
+        Route::put('/activities/{id}', [ActivityController::class, 'update'])->name('activities.update');
+        Route::delete('/activities/{id}', [ActivityController::class, 'destroy'])->name('activities.destroy');
 
         Route::get('/reference', [ReferenceController::class, 'index'])->name('references.index');
         Route::get('/references/picker', [ReferenceController::class, 'picker'])->name('references.picker');

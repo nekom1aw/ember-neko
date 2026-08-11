@@ -31,11 +31,25 @@
             </div>
         </div>
 
-        <div class="absolute bottom-28 right-3 z-[500] flex max-w-[calc(100%-1.5rem)] flex-wrap justify-end gap-2 text-xs font-semibold text-slate-600 sm:bottom-8 sm:right-5">
-            <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 ring-1 ring-slate-200"><span class="size-2.5 rounded-full bg-red-500"></span>{{ $language === 'en' ? 'High' : 'Tinggi' }}</span>
-            <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 ring-1 ring-slate-200"><span class="size-2.5 rounded-full bg-amber-400"></span>{{ $language === 'en' ? 'Medium' : 'Sedang' }}</span>
-            <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 ring-1 ring-slate-200"><span class="size-2.5 rounded-full bg-emerald-500"></span>{{ $language === 'en' ? 'Low' : 'Rendah' }}</span>
-            <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-2 ring-1 ring-slate-200"><span class="size-2.5 rounded-full bg-slate-500"></span>{{ $language === 'en' ? 'Unrated' : 'Belum dinilai' }}</span>
+        <div id="map-status-filter" class="absolute bottom-28 right-3 z-[500] w-[min(210px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:bottom-8 sm:right-5">
+            <div class="mb-2.5 flex items-center justify-between gap-3">
+                <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{{ $language === 'en' ? 'Status filter' : 'Filter status' }}</p>
+                <button type="button" data-map-status-reset class="text-[10px] font-black text-red-600 transition hover:text-red-500">{{ $language === 'en' ? 'Select all' : 'Pilih semua' }}</button>
+            </div>
+            <div class="grid grid-cols-1 gap-2 text-xs font-bold text-slate-600">
+                @foreach ([
+                    ['high', 'bg-red-500', $language === 'en' ? 'High' : 'Tinggi'],
+                    ['medium', 'bg-amber-400', $language === 'en' ? 'Medium' : 'Sedang'],
+                    ['low', 'bg-emerald-500', $language === 'en' ? 'Low' : 'Rendah'],
+                    ['unrated', 'bg-slate-500', $language === 'en' ? 'Unrated' : 'Belum dinilai'],
+                ] as [$key, $color, $label])
+                    <button type="button" data-map-status="{{ $key }}" aria-pressed="true" class="map-status-option flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left transition hover:border-slate-300 hover:bg-slate-50">
+                        <span class="size-2.5 shrink-0 rounded-full {{ $color }}"></span>
+                        <span class="truncate">{{ $label }}</span>
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" class="ml-auto size-3.5 shrink-0 text-red-600" aria-hidden="true"><path d="m4 10 4 4 8-8"/></svg>
+                    </button>
+                @endforeach
+            </div>
         </div>
 
         <div id="map-year-filter" class="absolute bottom-7 left-3 z-[550] w-[min(420px,calc(100%-1.5rem))] sm:bottom-8 sm:left-5">
@@ -70,12 +84,13 @@
                     <span id="map-result-count" class="sr-only">{{ $locations->count() }} {{ $language === 'en' ? 'locations' : 'lokasi' }}</span>
                 </output>
             </div>
+            <p class="mt-1 text-center text-[10px] font-bold text-slate-500">&larr; {{ $language === 'en' ? 'Drag to change year' : 'Geser untuk mengganti tahun' }} &rarr;</p>
         </div>
 
         <div class="absolute inset-0 bg-white">
             <div id="ember-map" class="h-full w-full bg-slate-100" aria-label="{{ $language === 'en' ? 'EMBER location distribution map' : 'Peta persebaran lokasi EMBER' }}"></div>
             <div id="map-filter-empty" class="pointer-events-none absolute right-4 top-4 z-[550] hidden max-w-sm bg-white/95 px-5 py-4 text-center text-sm font-semibold text-slate-700 shadow-lg backdrop-blur sm:right-5 sm:top-5" aria-live="polite">
-                {{ $language === 'en' ? 'No locations were found for the selected year.' : 'Tidak ada titik lokasi pada tahun yang dipilih.' }}
+                {{ $language === 'en' ? 'No locations match the selected filters.' : 'Tidak ada titik lokasi yang sesuai dengan filter.' }}
             </div>
 
             <aside id="map-detail-panel" data-open="false" class="map-detail-panel absolute inset-y-0 right-0 z-[600] flex w-full max-w-sm flex-col bg-white shadow-2xl" aria-hidden="true" aria-label="{{ $language === 'en' ? 'Location details' : 'Detail lokasi' }}">

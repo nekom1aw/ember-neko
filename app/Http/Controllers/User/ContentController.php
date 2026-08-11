@@ -123,9 +123,40 @@ class ContentController extends Controller
         ]);
     }
 
+    public function faq(Request $request): View
+    {
+        return view('user.faq', [
+            'faqs' => DB::table('faqs')->orderBy('sort_order')->orderBy('id')->get(),
+            'language' => $this->language($request),
+        ]);
+    }
+
+    public function activities(Request $request): View
+    {
+        return view('user.activities.index', [
+            'activities' => DB::table('activities')
+                ->where('status', 'publish')
+                ->orderByDesc('date')
+                ->orderByDesc('id')
+                ->get(),
+            'language' => $this->language($request),
+        ]);
+    }
+
+    public function activity(Request $request, int $id): View
+    {
+        return view('user.activities.show', [
+            'activity' => DB::table('activities')
+                ->where('id', $id)
+                ->where('status', 'publish')
+                ->firstOrFail(),
+            'language' => $this->language($request),
+        ]);
+    }
+
     public function statistics(Request $request): View
     {
-        $locations = DB::table('titik_lokasi')->select('date', 'confidence')->get();
+        $locations = DB::table('titik_lokasi')->select('provinsi', 'date', 'confidence')->get();
         $emptyCounts = ['high' => 0, 'medium' => 0, 'low' => 0, 'unrated' => 0];
         $summary = $locations->reduce(function (array $counts, object $location) {
             $counts[$this->statusKey($location->confidence)]++;
@@ -156,10 +187,36 @@ class ContentController extends Controller
             ->sortByDesc('year')
             ->values();
 
+        $years = $yearlyStatistics->pluck('year')->sort()->values();
+        $unknownProvince = $this->language($request) === 'en' ? 'Unknown province' : 'Provinsi belum diketahui';
+        $provinceStatistics = $locations
+            ->groupBy(fn (object $location) => filled($location->provinsi) ? trim($location->provinsi) : $unknownProvince)
+            ->map(function ($provinceLocations, string $province) use ($years) {
+                return [
+                    'name' => $province,
+                    'total' => $provinceLocations->count(),
+                    'yearly' => $years->map(fn (int $year) => $provinceLocations->filter(
+                        fn (object $location) => filled($location->date)
+                            && (int) substr((string) $location->date, 0, 4) === $year
+                    )->count())->values()->all(),
+                    'monthly' => $years->mapWithKeys(fn (int $year) => [
+                        (string) $year => collect(range(1, 12))->map(fn (int $month) => $provinceLocations->filter(
+                            fn (object $location) => filled($location->date)
+                                && (int) substr((string) $location->date, 0, 4) === $year
+                                && (int) substr((string) $location->date, 5, 2) === $month
+                        )->count())->values()->all(),
+                    ])->all(),
+                ];
+            })
+            ->sortByDesc('total')
+            ->values();
+
         return view('user.statistics', [
             'language' => $this->language($request),
             'summary' => ['total' => $locations->count(), ...$summary],
             'yearlyStatistics' => $yearlyStatistics,
+            'provinceYears' => $years,
+            'provinceStatistics' => $provinceStatistics,
         ]);
     }
 

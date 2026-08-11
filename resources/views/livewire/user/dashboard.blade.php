@@ -67,11 +67,7 @@
         <div class="mx-auto flex min-h-[680px] max-w-7xl flex-col px-4 pb-7 pt-12 sm:px-6 sm:pb-9 lg:px-8">
             <div class="flex flex-1 items-center justify-center py-12 text-center">
                 <div class="ember-hero-brand">
-                    <div class="mx-auto inline-flex items-center gap-2 rounded-full border border-white/15 bg-slate-950/25 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-200 backdrop-blur-md">
-                        <span class="relative flex size-2"><span class="absolute inline-flex size-full animate-ping rounded-full bg-red-400 opacity-75"></span><span class="relative inline-flex size-2 rounded-full bg-red-500"></span></span>
-                        {{ $t['eyebrow'] }}
-                    </div>
-                    <h1 class="mt-5 text-6xl font-black tracking-[-0.06em] text-white drop-shadow-2xl sm:text-7xl lg:text-8xl">EMBER</h1>
+                    <h1 class="text-6xl font-black tracking-[-0.06em] text-white drop-shadow-2xl sm:text-7xl lg:text-8xl">EMBER</h1>
                     <p class="mx-auto mt-3 max-w-lg text-xs font-bold uppercase tracking-[0.2em] text-white/70 sm:text-sm">Early Monitoring for Burning Environment Response</p>
                 </div>
             </div>

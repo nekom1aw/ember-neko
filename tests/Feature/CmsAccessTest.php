@@ -22,6 +22,12 @@ class CmsAccessTest extends TestCase
 
         $this->get('/cms/geojson')
             ->assertRedirect(route('cms.login'));
+
+        $this->get('/cms/faq')
+            ->assertRedirect(route('cms.login'));
+
+        $this->get('/cms/activities')
+            ->assertRedirect(route('cms.login'));
     }
 
     public function test_admin_can_login_and_view_location_detail(): void
@@ -628,5 +634,94 @@ class CmsAccessTest extends TestCase
             'name' => 'Kecamatan Upload Acak',
             'geojson_type' => 'FeatureCollection',
         ]);
+    }
+
+    public function test_admin_can_manage_bilingual_faq_and_public_can_switch_language(): void
+    {
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin)
+            ->post(route('cms.faq.store'), [
+                'question_id' => 'Apa itu EMBER?',
+                'question_en' => 'What is EMBER?',
+                'answer_id' => 'Platform pemantauan lingkungan.',
+                'answer_en' => 'An environmental monitoring platform.',
+            ])
+            ->assertSessionHas('success');
+
+        $faqId = DB::table('faqs')->value('id');
+
+        $this->get(route('user.faq', ['lang' => 'id']))
+            ->assertOk()
+            ->assertSee('Apa itu EMBER?')
+            ->assertSee('Platform pemantauan lingkungan.');
+
+        $this->get(route('user.faq', ['lang' => 'en']))
+            ->assertOk()
+            ->assertSee('What is EMBER?')
+            ->assertSee('An environmental monitoring platform.');
+
+        $this->actingAs($admin)
+            ->put(route('cms.faq.update', $faqId), [
+                'question_id' => 'Bagaimana data diproses?',
+                'question_en' => 'How is the data processed?',
+                'answer_id' => 'Data diverifikasi sebelum ditampilkan.',
+                'answer_en' => 'Data is verified before publication.',
+            ])
+            ->assertRedirect(route('cms.faq.index'));
+
+        $this->assertDatabaseHas('faqs', ['id' => $faqId, 'question_id' => 'Bagaimana data diproses?']);
+    }
+
+    public function test_admin_can_manage_activity_and_only_published_activity_is_public(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create();
+
+        $this->actingAs($admin)
+            ->post(route('cms.activities.store'), [
+                'image_id' => UploadedFile::fake()->image('aktivitas-id.jpg', 1200, 800),
+                'image_en' => UploadedFile::fake()->image('activity-en.jpg', 1200, 800),
+                'description_id' => 'Pemantauan lapangan di Sumatera.',
+                'description_en' => 'Field monitoring in Sumatra.',
+                'content_id' => '<p>Tim melakukan verifikasi data lapangan.</p>',
+                'content_en' => '<p>The team verified field data.</p>',
+                'date' => '2026-08-12',
+                'status' => 'draft',
+            ])
+            ->assertRedirect(route('cms.activities.index'));
+
+        $activity = DB::table('activities')->first();
+        $this->assertNotNull($activity);
+        Storage::disk('public')->assertExists($activity->image_id);
+        Storage::disk('public')->assertExists($activity->image_en);
+
+        $this->get(route('user.activities', ['lang' => 'id']))
+            ->assertOk()
+            ->assertDontSee('Pemantauan lapangan di Sumatera.');
+
+        $this->get(route('user.activities.show', ['id' => $activity->id, 'lang' => 'id']))
+            ->assertNotFound();
+
+        $this->actingAs($admin)
+            ->put(route('cms.activities.update', $activity->id), [
+                'description_id' => 'Pemantauan lapangan di Sumatera.',
+                'description_en' => 'Field monitoring in Sumatra.',
+                'content_id' => '<p>Tim melakukan verifikasi data lapangan.</p>',
+                'content_en' => '<p>The team verified field data.</p>',
+                'date' => '2026-08-12',
+                'status' => 'publish',
+            ])
+            ->assertRedirect(route('cms.activities.index'));
+
+        $this->get(route('user.activities.show', ['id' => $activity->id, 'lang' => 'id']))
+            ->assertOk()
+            ->assertSee('Pemantauan lapangan di Sumatera.')
+            ->assertSee('Tim melakukan verifikasi data lapangan.', false);
+
+        $this->get(route('user.activities.show', ['id' => $activity->id, 'lang' => 'en']))
+            ->assertOk()
+            ->assertSee('Field monitoring in Sumatra.')
+            ->assertSee('The team verified field data.', false);
     }
 }

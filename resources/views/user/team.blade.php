@@ -15,7 +15,6 @@
                 <span class="size-1.5 rounded-full bg-red-500"></span> EMBER People
             </div>
             <h1 class="mt-4 text-4xl font-black tracking-[-0.04em] sm:text-5xl">{{ $language === 'en' ? 'Meet the team behind EMBER' : 'Kenali tim di balik EMBER' }}</h1>
-            <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-400 sm:text-base">{{ $language === 'en' ? 'The people who manage, review, and present environmental monitoring data.' : 'Orang-orang yang mengelola, meninjau, dan menyajikan data pemantauan lingkungan.' }}</p>
         </div>
 
         @if ($members->isNotEmpty())

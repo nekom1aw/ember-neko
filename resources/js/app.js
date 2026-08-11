@@ -26,6 +26,8 @@ const EmberMap = {
     },
     locations: [],
     language: 'id',
+    selectedYear: 'all',
+    activeStatusKeys: new Set(['high', 'medium', 'low', 'unrated']),
 
     init() {
         const mapElement = document.getElementById('ember-map');
@@ -45,6 +47,14 @@ const EmberMap = {
             scrollWheelZoom: false,
         }).setView([-2.5, 118], 5);
 
+        ['map-year-filter', 'map-status-filter', 'map-drilldown-control'].forEach((controlId) => {
+            const control = document.getElementById(controlId);
+            if (!control) return;
+
+            L.DomEvent.disableClickPropagation(control);
+            L.DomEvent.disableScrollPropagation(control);
+        });
+
         L.tileLayer(
             'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
             {
@@ -60,6 +70,7 @@ const EmberMap = {
         this.markerLayer = L.layerGroup().addTo(this.map);
         this.renderMarkers(locations, { fitView: true });
         this.initializeYearFilter();
+        this.initializeStatusFilter();
         this.initializeBoundaryDrilldown();
         this.initializeBoundaryHover();
         this.map.on('click', (event) => {
@@ -509,14 +520,14 @@ const EmberMap = {
             return;
         }
 
+        ['pointerdown', 'mousedown', 'touchstart'].forEach((eventName) => {
+            yearRange.addEventListener(eventName, (event) => event.stopPropagation(), { passive: true });
+        });
+
         yearRange.addEventListener('input', () => {
             const selectedIndex = Number(yearRange.value);
             const selectedYear = selectedIndex === years.length ? 'all' : years[selectedIndex];
-            const filteredLocations = selectedYear === 'all'
-                ? this.locations
-                : this.locations.filter((location) =>
-                    location.date && String(location.date).slice(0, 4) === selectedYear
-                );
+            this.selectedYear = selectedYear;
             const ratio = Number(yearRange.max) > 0
                 ? selectedIndex / Number(yearRange.max)
                 : 1;
@@ -531,8 +542,7 @@ const EmberMap = {
                 ? (this.language === 'en' ? 'All' : 'Semua')
                 : selectedYear;
             yearRange.setAttribute('aria-valuetext', yearLabel.textContent);
-            this.renderMarkers(filteredLocations, { fitView: false });
-            this.closeLocationDetail();
+            this.applyLocationFilters();
         });
 
         yearRange.setAttribute('aria-valuetext', yearLabel.textContent);
@@ -545,23 +555,64 @@ const EmberMap = {
         });
     },
 
+    initializeStatusFilter() {
+        const buttons = Array.from(document.querySelectorAll('[data-map-status]'));
+        const resetButton = document.querySelector('[data-map-status-reset]');
+
+        if (buttons.length === 0) return;
+
+        buttons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const status = button.dataset.mapStatus;
+
+                if (this.activeStatusKeys.has(status)) {
+                    this.activeStatusKeys.delete(status);
+                } else {
+                    this.activeStatusKeys.add(status);
+                }
+
+                button.setAttribute('aria-pressed', this.activeStatusKeys.has(status) ? 'true' : 'false');
+                this.applyLocationFilters();
+            });
+        });
+
+        resetButton?.addEventListener('click', () => {
+            this.activeStatusKeys = new Set(['high', 'medium', 'low', 'unrated']);
+            buttons.forEach((button) => button.setAttribute('aria-pressed', 'true'));
+            this.applyLocationFilters();
+        });
+    },
+
+    applyLocationFilters() {
+        const filteredLocations = this.locations.filter((location) => {
+            const matchesYear = this.selectedYear === 'all'
+                || (location.date && String(location.date).slice(0, 4) === this.selectedYear);
+            const status = this.statusFor(location.confidence);
+
+            return matchesYear && this.activeStatusKeys.has(status.key);
+        });
+
+        this.renderMarkers(filteredLocations, { fitView: false });
+        this.closeLocationDetail();
+    },
+
     statusFor(confidence) {
         if (confidence === null || String(confidence).trim() === '') {
-            return { label: this.language === 'en' ? 'Unrated' : 'Belum dinilai', color: '#64748b' };
+            return { key: 'unrated', label: this.language === 'en' ? 'Unrated' : 'Belum dinilai', color: '#64748b' };
         }
 
         const value = String(confidence).trim().toLowerCase();
         const numericValue = Number(value);
 
         if (['high', 'tinggi'].includes(value) || (Number.isFinite(numericValue) && numericValue >= 80)) {
-            return { label: this.language === 'en' ? 'High' : 'Tinggi', color: '#ef4444' };
+            return { key: 'high', label: this.language === 'en' ? 'High' : 'Tinggi', color: '#ef4444' };
         }
 
         if (['nominal', 'medium', 'sedang'].includes(value) || (Number.isFinite(numericValue) && numericValue >= 50)) {
-            return { label: this.language === 'en' ? 'Medium' : 'Sedang', color: '#f59e0b' };
+            return { key: 'medium', label: this.language === 'en' ? 'Medium' : 'Sedang', color: '#f59e0b' };
         }
 
-        return { label: this.language === 'en' ? 'Low' : 'Rendah', color: '#10b981' };
+        return { key: 'low', label: this.language === 'en' ? 'Low' : 'Rendah', color: '#10b981' };
     },
 
     showLocationDetail(location, status) {
@@ -846,3 +897,150 @@ const initializeTeamCarousel = () => {
 
 document.addEventListener('DOMContentLoaded', initializeTeamCarousel);
 document.addEventListener('livewire:navigated', initializeTeamCarousel);
+
+const initializeProvinceTrendCharts = () => {
+    document.querySelectorAll('[data-province-trend]:not([data-initialized])').forEach((root) => {
+        const dataElement = root.querySelector('[data-province-trend-data]');
+        const svg = root.querySelector('[data-province-chart]');
+        const select = root.querySelector('[data-province-select]');
+        const periodSelect = root.querySelector('[data-province-period]');
+        const yearSelect = root.querySelector('[data-province-year]');
+        const yearWrapper = root.querySelector('[data-province-year-wrapper]');
+        const nameElement = root.querySelector('[data-province-chart-name]');
+        const subtitleElement = root.querySelector('[data-province-chart-subtitle]');
+        const totalElement = root.querySelector('[data-province-chart-total]');
+        const options = Array.from(root.querySelectorAll('[data-province-option]'));
+
+        if (!dataElement || !svg || !select || !periodSelect || !yearSelect) return;
+
+        const payload = JSON.parse(dataElement.textContent || '{}');
+        const years = Array.isArray(payload.years) ? payload.years : [];
+        const provinces = Array.isArray(payload.provinces) ? payload.provinces : [];
+        const monthLabels = Array.isArray(payload.months) ? payload.months : [];
+        if (years.length === 0 || provinces.length === 0) return;
+
+        root.dataset.initialized = 'true';
+        const namespace = 'http://www.w3.org/2000/svg';
+        const width = 900;
+        const height = 330;
+        const margin = { top: 28, right: 24, bottom: 48, left: 58 };
+        const plotWidth = width - margin.left - margin.right;
+        const plotHeight = height - margin.top - margin.bottom;
+
+        const createSvgElement = (tag, attributes = {}) => {
+            const element = document.createElementNS(namespace, tag);
+            Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
+            return element;
+        };
+
+        const render = (provinceIndex) => {
+            const province = provinces[provinceIndex] || provinces[0];
+            const isMonthly = periodSelect.value === 'monthly';
+            const selectedYear = String(yearSelect.value || years.at(-1));
+            const labels = isMonthly ? monthLabels : years;
+            const values = isMonthly
+                ? (Array.isArray(province.monthly?.[selectedYear]) ? province.monthly[selectedYear].map(Number) : Array(12).fill(0))
+                : (Array.isArray(province.yearly) ? province.yearly.map(Number) : []);
+            const maxValue = Math.max(1, ...values);
+            const xFor = (index) => labels.length === 1
+                ? margin.left + plotWidth / 2
+                : margin.left + (index / (labels.length - 1)) * plotWidth;
+            const yFor = (value) => margin.top + plotHeight - (value / maxValue) * plotHeight;
+
+            svg.replaceChildren();
+            nameElement.textContent = province.name;
+            subtitleElement.textContent = isMonthly ? payload.monthlySubtitle : payload.yearlySubtitle;
+            totalElement.textContent = values.reduce((sum, value) => sum + value, 0).toLocaleString('id-ID');
+            select.value = String(provinceIndex);
+            yearWrapper?.classList.toggle('hidden', !isMonthly);
+            options.forEach((option) => {
+                const optionIndex = Number(option.dataset.provinceOption);
+                const optionProvince = provinces[optionIndex];
+                const optionValues = isMonthly
+                    ? (optionProvince?.monthly?.[selectedYear] || [])
+                    : (optionProvince?.yearly || []);
+                option.dataset.active = option.dataset.provinceOption === String(provinceIndex) ? 'true' : 'false';
+                const total = option.querySelector('[data-province-option-total]');
+                if (total) total.textContent = optionValues.reduce((sum, value) => sum + Number(value), 0).toLocaleString('id-ID');
+            });
+
+            const defs = createSvgElement('defs');
+            const gradient = createSvgElement('linearGradient', { id: 'province-line-fill', x1: '0', y1: '0', x2: '0', y2: '1' });
+            gradient.append(
+                Object.assign(createSvgElement('stop', { offset: '0%', 'stop-color': '#ef4444', 'stop-opacity': '.32' })),
+                Object.assign(createSvgElement('stop', { offset: '100%', 'stop-color': '#ef4444', 'stop-opacity': '0' })),
+            );
+            defs.append(gradient);
+            svg.append(defs);
+
+            for (let step = 0; step <= 4; step++) {
+                const value = (maxValue / 4) * step;
+                const y = yFor(value);
+                svg.append(createSvgElement('line', {
+                    x1: margin.left, y1: y, x2: width - margin.right, y2: y,
+                    stroke: 'rgba(255,255,255,.09)', 'stroke-width': 1,
+                }));
+                const label = createSvgElement('text', {
+                    x: margin.left - 12, y: y + 4, fill: '#64748b',
+                    'font-size': 11, 'font-weight': 700, 'text-anchor': 'end',
+                });
+                label.textContent = String(Math.round(value));
+                svg.append(label);
+            }
+
+            labels.forEach((labelValue, index) => {
+                const label = createSvgElement('text', {
+                    x: xFor(index), y: height - 18, fill: '#94a3b8',
+                    'font-size': 11, 'font-weight': 700, 'text-anchor': 'middle',
+                });
+                label.textContent = String(labelValue);
+                svg.append(label);
+            });
+
+            const points = values.map((value, index) => [xFor(index), yFor(value)]);
+            const linePath = points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${x} ${y}`).join(' ');
+            const areaPath = points.length > 0
+                ? `M ${points[0][0]} ${margin.top + plotHeight} ${linePath.replace(/^M/, 'L')} L ${points.at(-1)[0]} ${margin.top + plotHeight} Z`
+                : '';
+
+            svg.append(createSvgElement('path', { d: areaPath, fill: 'url(#province-line-fill)' }));
+            const path = createSvgElement('path', {
+                d: linePath, fill: 'none', stroke: '#f87171', 'stroke-width': 4,
+                'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+            });
+            svg.append(path);
+
+            const pathLength = path.getTotalLength();
+            path.style.strokeDasharray = String(pathLength);
+            path.style.strokeDashoffset = String(pathLength);
+            path.style.transition = 'stroke-dashoffset 700ms cubic-bezier(.16, 1, .3, 1)';
+            requestAnimationFrame(() => { path.style.strokeDashoffset = '0'; });
+
+            points.forEach(([x, y], index) => {
+                const marker = createSvgElement('g');
+                marker.append(createSvgElement('circle', { cx: x, cy: y, r: 9, fill: '#0f172a', stroke: '#f87171', 'stroke-width': 3 }));
+                marker.append(createSvgElement('circle', { cx: x, cy: y, r: 3, fill: '#fff' }));
+                const title = createSvgElement('title');
+                title.textContent = `${labels[index]}${isMonthly ? ` ${selectedYear}` : ''}: ${values[index]} ${payload.locationLabel}`;
+                marker.append(title);
+
+                const valueLabel = createSvgElement('text', {
+                    x, y: Math.max(15, y - 16), fill: '#f8fafc',
+                    'font-size': 12, 'font-weight': 800, 'text-anchor': 'middle',
+                });
+                valueLabel.textContent = String(values[index]);
+                marker.append(valueLabel);
+                svg.append(marker);
+            });
+        };
+
+        select.addEventListener('change', () => render(Number(select.value)));
+        periodSelect.addEventListener('change', () => render(Number(select.value)));
+        yearSelect.addEventListener('change', () => render(Number(select.value)));
+        options.forEach((option) => option.addEventListener('click', () => render(Number(option.dataset.provinceOption))));
+        render(0);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initializeProvinceTrendCharts);
+document.addEventListener('livewire:navigated', initializeProvinceTrendCharts);
