@@ -71,7 +71,8 @@ class ExampleTest extends TestCase
             ->assertSee(route('user.about', ['lang' => 'en']), false)
             ->assertSee(route('user.team', ['lang' => 'en']), false)
             ->assertSee('id="back-to-top"', false)
-            ->assertSee('header class="sticky', false)
+            ->assertSee('header class="relative', false)
+            ->assertDontSee('header class="sticky', false)
             ->assertSee('Recently added data');
     }
 
@@ -136,7 +137,12 @@ class ExampleTest extends TestCase
             ->assertSee('data-province-period', false)
             ->assertSee('data-province-year', false)
             ->assertSee('Per bulan')
-            ->assertSee('"monthly":{"2024":[0,1,1', false);
+            ->assertSee('"monthly":{"2024":[0,1,1', false)
+            ->assertSee('data-annual-donut', false)
+            ->assertSee('data-annual-donut-year', false)
+            ->assertSee('Statistik donat tahunan')
+            ->assertDontSee('Rekap tahunan')
+            ->assertDontSee('hover:-translate-y-1', false);
 
         $this->get(route('user.statistics', ['lang' => 'en']))
             ->assertOk()

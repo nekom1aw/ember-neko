@@ -5,14 +5,24 @@
 @section('content')
     @php
         $statuses = [
-            'high' => ['label' => $language === 'en' ? 'High' : 'Tinggi', 'color' => 'bg-red-500', 'text' => 'text-red-600', 'hex' => '#ef4444'],
-            'medium' => ['label' => $language === 'en' ? 'Medium' : 'Sedang', 'color' => 'bg-amber-400', 'text' => 'text-amber-600', 'hex' => '#fbbf24'],
-            'low' => ['label' => $language === 'en' ? 'Low' : 'Rendah', 'color' => 'bg-emerald-500', 'text' => 'text-emerald-600', 'hex' => '#10b981'],
-            'unrated' => ['label' => $language === 'en' ? 'Unrated' : 'Belum dinilai', 'color' => 'bg-slate-500', 'text' => 'text-slate-600', 'hex' => '#64748b'],
+            'high' => ['label' => $language === 'en' ? 'High' : 'Tinggi', 'color' => 'bg-red-700', 'text' => 'text-red-700', 'hex' => '#b91c1c'],
+            'medium' => ['label' => $language === 'en' ? 'Medium' : 'Sedang', 'color' => 'bg-amber-600', 'text' => 'text-amber-700', 'hex' => '#d97706'],
+            'low' => ['label' => $language === 'en' ? 'Low' : 'Rendah', 'color' => 'bg-emerald-700', 'text' => 'text-emerald-700', 'hex' => '#047857'],
+            'unrated' => ['label' => $language === 'en' ? 'Unrated' : 'Belum dinilai', 'color' => 'bg-slate-700', 'text' => 'text-slate-700', 'hex' => '#334155'],
         ];
         $chartStatistics = $yearlyStatistics->sortBy('year')->values();
         $maxYearTotal = max(1, (int) $chartStatistics->max('total'));
         $latestStatistic = $chartStatistics->last();
+        $donutStops = [];
+        $donutOffset = 0;
+        foreach ($statuses as $key => $status) {
+            $donutEnd = $donutOffset + ($latestStatistic ? $latestStatistic['percentages'][$key] : 0);
+            $donutStops[] = $status['hex'].' '.$donutOffset.'% '.$donutEnd.'%';
+            $donutOffset = $donutEnd;
+        }
+        $donutBackground = $donutOffset > 0
+            ? 'conic-gradient('.implode(', ', $donutStops).')'
+            : 'conic-gradient(#e2e8f0 0% 100%)';
     @endphp
 
     <section class="relative isolate overflow-hidden bg-slate-950 px-4 py-14 text-white sm:px-6 lg:px-8 lg:py-18">
@@ -36,7 +46,7 @@
                 <p class="relative mt-2 text-xs text-slate-500">{{ $language === 'en' ? 'Recorded monitoring points' : 'Titik pemantauan tercatat' }}</p>
             </article>
             @foreach ($statuses as $key => $status)
-                <article class="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-950/[.06]">
+                <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="flex items-center justify-between gap-2">
                         <p class="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">{{ $status['label'] }}</p>
                         <span class="size-2.5 rounded-full {{ $status['color'] }} shadow-[0_0_0_4px_rgba(148,163,184,.1)]"></span>
@@ -197,34 +207,50 @@
                 ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
             </section>
 
-            <section class="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white" data-reveal>
-                <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
+            <section class="mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,.07)]" data-reveal data-annual-donut>
+                <div class="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
                     <div>
-                        <p class="text-[10px] font-black uppercase tracking-wider text-red-600">{{ $language === 'en' ? 'Detailed data' : 'Data rinci' }}</p>
-                        <h2 class="mt-1 text-lg font-black text-slate-950">{{ $language === 'en' ? 'Annual recap' : 'Rekap tahunan' }}</h2>
+                        <p class="text-[10px] font-black uppercase tracking-wider text-red-600">{{ $language === 'en' ? 'Status composition' : 'Komposisi status' }}</p>
+                        <h2 class="mt-1 text-2xl font-black text-slate-950">{{ $language === 'en' ? 'Annual donut statistics' : 'Statistik donat tahunan' }}</h2>
+                        <p class="mt-2 text-sm text-slate-500">{{ $language === 'en' ? 'Select a year to view its confidence distribution.' : 'Pilih tahun untuk melihat distribusi confidence.' }}</p>
                     </div>
-                    <span class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500">{{ $chartStatistics->count() }} {{ $language === 'en' ? 'years' : 'tahun' }}</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
-                        <thead class="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                            <tr>
-                                <th class="px-5 py-4">{{ $language === 'en' ? 'Year' : 'Tahun' }}</th>
-                                <th class="px-5 py-4">{{ $language === 'en' ? 'Total' : 'Jumlah' }}</th>
-                                @foreach ($statuses as $status)<th class="px-5 py-4"><span class="inline-flex items-center gap-2"><i class="size-2 rounded-full {{ $status['color'] }}"></i>{{ $status['label'] }}</span></th>@endforeach
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
+                    <label class="text-xs font-black uppercase tracking-wider text-slate-500">
+                        {{ $language === 'en' ? 'Selected year' : 'Tahun terpilih' }}
+                        <select data-annual-donut-year class="mt-2 block min-w-40 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-black text-slate-950 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-100">
                             @foreach ($chartStatistics->reverse() as $statistic)
-                                <tr class="transition hover:bg-slate-50">
-                                    <td class="px-5 py-4 font-black text-slate-950">{{ $statistic['year'] }}</td>
-                                    <td class="px-5 py-4 font-black text-slate-950">{{ $statistic['total'] }}</td>
-                                    @foreach ($statuses as $key => $status)<td class="px-5 py-4 font-medium text-slate-600">{{ $statistic['counts'][$key] }}</td>@endforeach
-                                </tr>
+                                <option value="{{ $statistic['year'] }}">{{ $statistic['year'] }}</option>
                             @endforeach
-                        </tbody>
-                    </table>
+                        </select>
+                    </label>
                 </div>
+                <div class="grid items-center gap-8 p-5 sm:p-7 lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)] lg:p-9">
+                    <div class="relative mx-auto aspect-square w-full max-w-[340px]">
+                        <div data-annual-donut-chart class="absolute inset-0 rounded-full shadow-[0_20px_50px_rgba(15,23,42,.12)] transition-[background] duration-500" style="background: {{ $donutBackground }}" role="img" aria-label="{{ $language === 'en' ? 'Annual confidence status donut chart' : 'Grafik donat status confidence tahunan' }}"></div>
+                        <div class="absolute inset-[22%] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-inner ring-1 ring-slate-100">
+                            <span data-annual-donut-year-label class="text-xs font-black uppercase tracking-[0.18em] text-red-600">{{ $latestStatistic['year'] }}</span>
+                            <strong data-annual-donut-total class="mt-2 text-4xl font-black tracking-tight text-slate-950">{{ number_format($latestStatistic['total']) }}</strong>
+                            <span class="mt-1 text-xs font-semibold text-slate-400">{{ $language === 'en' ? 'total locations' : 'total lokasi' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        @foreach ($statuses as $key => $status)
+                            <article data-annual-donut-item="{{ $key }}" class="border border-slate-200 bg-slate-50/70 p-4 transition hover:border-slate-300 hover:bg-white">
+                                <div class="flex items-center justify-between gap-3">
+                                    <span class="inline-flex items-center gap-2 text-sm font-black text-slate-700"><i class="size-3 rounded-full {{ $status['color'] }}"></i>{{ $status['label'] }}</span>
+                                    <span data-annual-donut-percentage class="rounded-full bg-white px-2.5 py-1 text-xs font-black {{ $status['text'] }} ring-1 ring-slate-200">{{ number_format($latestStatistic['percentages'][$key], 1) }}%</span>
+                                </div>
+                                <p data-annual-donut-count class="mt-4 text-3xl font-black tracking-tight text-slate-950">{{ number_format($latestStatistic['counts'][$key]) }}</p>
+                                <p class="mt-1 text-xs text-slate-400">{{ $language === 'en' ? 'monitoring points' : 'titik pemantauan' }}</p>
+                            </article>
+                        @endforeach
+                    </div>
+                </div>
+                <script data-annual-donut-data type="application/json">{!! json_encode([
+                    'locale' => $language === 'en' ? 'en-US' : 'id-ID',
+                    'statistics' => $chartStatistics,
+                    'statuses' => collect($statuses)->map(fn (array $status) => ['color' => $status['hex']]),
+                ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
             </section>
         @else
             <div class="mt-8 rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">{{ $language === 'en' ? 'No dated location data is available yet.' : 'Belum ada data lokasi yang memiliki tanggal.' }}</div>

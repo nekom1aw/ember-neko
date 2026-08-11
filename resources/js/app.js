@@ -1044,3 +1044,60 @@ const initializeProvinceTrendCharts = () => {
 
 document.addEventListener('DOMContentLoaded', initializeProvinceTrendCharts);
 document.addEventListener('livewire:navigated', initializeProvinceTrendCharts);
+
+const initializeAnnualDonutCharts = () => {
+    document.querySelectorAll('[data-annual-donut]:not([data-initialized])').forEach((root) => {
+        const dataElement = root.querySelector('[data-annual-donut-data]');
+        const chart = root.querySelector('[data-annual-donut-chart]');
+        const yearSelect = root.querySelector('[data-annual-donut-year]');
+        const yearLabel = root.querySelector('[data-annual-donut-year-label]');
+        const totalElement = root.querySelector('[data-annual-donut-total]');
+
+        if (!dataElement || !chart || !yearSelect || !yearLabel || !totalElement) return;
+
+        const payload = JSON.parse(dataElement.textContent || '{}');
+        const statistics = Array.isArray(payload.statistics) ? payload.statistics : [];
+        const statuses = payload.statuses || {};
+        const statusKeys = Object.keys(statuses);
+
+        if (statistics.length === 0 || statusKeys.length === 0) return;
+
+        root.dataset.initialized = 'true';
+        const formatter = new Intl.NumberFormat(payload.locale || 'id-ID');
+
+        const render = (selectedYear) => {
+            const statistic = statistics.find((item) => String(item.year) === String(selectedYear)) || statistics.at(-1);
+            let offset = 0;
+            const stops = statusKeys.map((key) => {
+                const percentage = Number(statistic.percentages?.[key] || 0);
+                const start = offset;
+                offset += percentage;
+
+                return `${statuses[key].color} ${start}% ${offset}%`;
+            });
+
+            chart.style.background = offset > 0
+                ? `conic-gradient(${stops.join(', ')})`
+                : 'conic-gradient(#e2e8f0 0% 100%)';
+            chart.setAttribute('aria-label', `${statistic.year}: ${formatter.format(statistic.total)} total locations`);
+            yearLabel.textContent = statistic.year;
+            totalElement.textContent = formatter.format(statistic.total);
+
+            statusKeys.forEach((key) => {
+                const item = root.querySelector(`[data-annual-donut-item="${key}"]`);
+                if (!item) return;
+
+                const count = item.querySelector('[data-annual-donut-count]');
+                const percentage = item.querySelector('[data-annual-donut-percentage]');
+                if (count) count.textContent = formatter.format(statistic.counts?.[key] || 0);
+                if (percentage) percentage.textContent = `${Number(statistic.percentages?.[key] || 0).toFixed(1)}%`;
+            });
+        };
+
+        yearSelect.addEventListener('change', () => render(yearSelect.value));
+        render(yearSelect.value);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initializeAnnualDonutCharts);
+document.addEventListener('livewire:navigated', initializeAnnualDonutCharts);

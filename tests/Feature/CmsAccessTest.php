@@ -61,9 +61,13 @@ class CmsAccessTest extends TestCase
         $admin = User::factory()->create();
 
         $this->actingAs($admin)
+            ->get(route('cms.about.edit'))
+            ->assertOk()
+            ->assertDontSee('name="image_id"', false)
+            ->assertDontSee('name="image_en"', false);
+
+        $this->actingAs($admin)
             ->put(route('cms.about.update'), [
-                'image_id' => UploadedFile::fake()->image('about-id.jpg', 1200, 800),
-                'image_en' => UploadedFile::fake()->image('about-en.jpg', 1200, 800),
                 'content_id' => 'Sistem pemantauan dini.',
                 'content_en' => 'An early monitoring system.',
             ])
@@ -73,6 +77,11 @@ class CmsAccessTest extends TestCase
             'content_id' => 'Sistem pemantauan dini.',
             'content_en' => 'An early monitoring system.',
         ]);
+
+        $this->get(route('user.about', ['lang' => 'id']))
+            ->assertOk()
+            ->assertSee('Sistem pemantauan dini.')
+            ->assertDontSee('Gambar belum tersedia');
 
         $this->actingAs($admin)
             ->post(route('cms.team.store'), [

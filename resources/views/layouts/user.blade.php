@@ -15,16 +15,10 @@
         <span class="mr-2 inline-block size-1.5 rounded-full bg-red-500 align-middle shadow-[0_0_10px_rgba(239,68,68,.9)]"></span>
         Early Monitoring for Burning Environment Response
     </div>
-    <header class="sticky top-0 z-[60] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,.04)] backdrop-blur-xl">
+    <header class="relative z-[60] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,.04)] backdrop-blur-xl">
         <nav class="mx-auto flex min-h-17 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="{{ $currentLanguage === 'en' ? 'Main navigation' : 'Navigasi utama' }}">
             <a href="{{ route('user.dashboard', ['lang' => $currentLanguage]) }}" class="flex shrink-0 items-center gap-3">
-                <span class="relative size-10 shrink-0 overflow-hidden bg-white shadow-lg shadow-red-600/15 ring-1 ring-slate-200">
-                    <img src="{{ asset('images/ember-logo.png') }}" alt="" class="absolute -left-[17px] -top-[10px] size-[74px] max-w-none" aria-hidden="true">
-                </span>
-                <span>
-                    <span class="block text-lg font-black leading-none tracking-tight text-slate-950">EMBER</span>
-                    <span class="mt-1 hidden text-[8px] font-bold uppercase tracking-[0.1em] text-slate-400 sm:block">Environmental monitoring portal</span>
-                </span>
+                <img src="{{ asset('images/ember-logo.png') }}" alt="EMBER - Early Monitoring for Burning Environment Response" class="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20">
             </a>
 
             <div class="hidden items-center gap-1 rounded-xl bg-slate-100/80 p-1 text-xs font-bold text-slate-600 lg:flex">
