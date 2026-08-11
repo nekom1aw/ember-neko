@@ -31,7 +31,62 @@
             </div>
         </div>
 
-        <div id="map-status-filter" class="absolute bottom-28 right-3 z-[500] w-[min(210px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:bottom-8 sm:right-5">
+        <section id="map-statistics-panel" class="absolute right-3 top-56 z-[500] max-h-[calc(100%-15rem)] w-[min(330px,calc(100%-1.5rem))] overflow-y-auto bg-white/95 p-4 shadow-xl ring-1 ring-slate-200 backdrop-blur sm:right-5 sm:top-40 sm:max-h-[calc(100%-11rem)]" aria-label="{{ $language === 'en' ? 'Map statistics' : 'Statistik peta' }}">
+            <div class="flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+                <div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.18em] text-red-700">{{ $language === 'en' ? 'Status statistics' : 'Statistik status' }}</p>
+                    <h2 id="map-statistics-region" class="mt-1 text-base font-black text-slate-950">Sumatera</h2>
+                </div>
+                <span id="map-statistics-period" class="bg-slate-100 px-2 py-1 text-[9px] font-black text-slate-500">{{ $language === 'en' ? 'All years' : 'Semua tahun' }}</span>
+            </div>
+
+            <div class="grid grid-cols-[112px_1fr] items-center gap-4 py-4">
+                <div class="relative mx-auto size-28">
+                    <div id="map-yearly-donut" class="absolute inset-0 rounded-full bg-slate-200" role="img" aria-label="{{ $language === 'en' ? 'Yearly status donut chart' : 'Grafik donat status tahunan' }}"></div>
+                    <div class="absolute inset-[24%] flex flex-col items-center justify-center rounded-full bg-white shadow-inner">
+                        <strong id="map-yearly-total" class="text-xl font-black text-slate-950">0</strong>
+                        <span class="text-[8px] font-black uppercase tracking-wider text-slate-400">{{ $language === 'en' ? 'locations' : 'lokasi' }}</span>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    @foreach ([
+                        ['high', '#b91c1c', $language === 'en' ? 'High' : 'Tinggi'],
+                        ['medium', '#d97706', $language === 'en' ? 'Medium' : 'Sedang'],
+                        ['low', '#047857', $language === 'en' ? 'Low' : 'Rendah'],
+                        ['unrated', '#334155', $language === 'en' ? 'Unrated' : 'Belum dinilai'],
+                    ] as [$key, $color, $label])
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <span class="size-2 shrink-0 rounded-full" style="background: {{ $color }}"></span>
+                            <span class="min-w-0 flex-1 truncate font-bold text-slate-600">{{ $label }}</span>
+                            <strong data-map-yearly-count="{{ $key }}" class="font-black text-slate-950">0</strong>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            <div id="map-monthly-statistics" class="hidden border-t border-slate-200 pt-4">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">{{ $language === 'en' ? 'Monthly status' : 'Status per bulan' }}</p>
+                        <p id="map-monthly-title" class="mt-1 text-xs font-black text-slate-800">-</p>
+                    </div>
+                    <span id="map-monthly-total" class="text-xs font-black text-red-700">0</span>
+                </div>
+                <div class="mt-4 grid h-28 grid-cols-12 items-end gap-1 border-b border-slate-200 px-1" aria-label="{{ $language === 'en' ? 'Monthly status bar chart' : 'Grafik batang status bulanan' }}">
+                    @foreach (($language === 'en'
+                        ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                        : ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']) as $index => $month)
+                        <div class="flex h-full min-w-0 flex-col justify-end" title="{{ $month }}">
+                            <div data-map-month-bar="{{ $index }}" class="flex min-h-0 w-full flex-col-reverse overflow-hidden bg-slate-100"></div>
+                            <span class="mt-1 block truncate text-center text-[7px] font-bold text-slate-400">{{ $month }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        </section>
+
+        <div id="map-status-filter" class="absolute bottom-28 left-3 z-[500] w-[min(210px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur sm:bottom-32 sm:left-5">
             <div class="mb-2.5 flex items-center justify-between gap-3">
                 <p class="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{{ $language === 'en' ? 'Status filter' : 'Filter status' }}</p>
                 <button type="button" data-map-status-reset class="text-[10px] font-black text-red-600 transition hover:text-red-500">{{ $language === 'en' ? 'Select all' : 'Pilih semua' }}</button>

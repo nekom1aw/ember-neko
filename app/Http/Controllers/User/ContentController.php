@@ -5,7 +5,9 @@ namespace App\Http\Controllers\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ContentController extends Controller
 {
@@ -43,6 +45,100 @@ class ContentController extends Controller
             'locations' => $locations,
             'boundaryLayers' => $boundaryLayers,
             'language' => $language,
+        ]);
+    }
+
+    public function data(Request $request): View
+    {
+        return view('user.data', [
+            'language' => $this->language($request),
+            'years' => DB::table('titik_lokasi')
+                ->whereNotNull('date')
+                ->pluck('date')
+                ->map(fn ($date) => (int) substr((string) $date, 0, 4))
+                ->filter()
+                ->unique()
+                ->sortDesc()
+                ->values(),
+            'provinces' => DB::table('titik_lokasi')
+                ->whereNotNull('provinsi')
+                ->where('provinsi', '!=', '')
+                ->distinct()
+                ->orderBy('provinsi')
+                ->pluck('provinsi'),
+        ]);
+    }
+
+    public function downloadLocationCsv(Request $request): StreamedResponse
+    {
+        $validated = $request->validate([
+            'scope' => ['nullable', 'in:all,year,province'],
+            'year' => ['nullable', 'required_if:scope,year', 'integer', 'digits:4'],
+            'province' => ['nullable', 'required_if:scope,province', 'string', 'max:255'],
+        ]);
+        $scope = $validated['scope'] ?? 'all';
+        $year = isset($validated['year']) ? (int) $validated['year'] : null;
+        $province = $validated['province'] ?? null;
+        $filenameSuffix = match ($scope) {
+            'year' => (string) $year,
+            'province' => Str::slug((string) $province),
+            default => 'semua',
+        };
+
+        return response()->streamDownload(function () use ($scope, $year, $province): void {
+            $output = fopen('php://output', 'w');
+
+            if ($output === false) {
+                return;
+            }
+
+            fwrite($output, "\xEF\xBB\xBF");
+            fputcsv($output, [
+                'provinsi',
+                'kabupaten_kota',
+                'kecamatan',
+                'desa',
+                'latitude',
+                'longitude',
+                'date',
+                'confidence',
+            ], ',', '"', '');
+
+            $safeText = static function (mixed $value): mixed {
+                if (is_string($value) && preg_match('/^[=+\-@]/', $value) === 1) {
+                    return "'{$value}";
+                }
+
+                return $value;
+            };
+
+            $query = DB::table('titik_lokasi');
+
+            if ($scope === 'year') {
+                $query->whereYear('date', $year);
+            } elseif ($scope === 'province') {
+                $query->where('provinsi', $province);
+            }
+
+            $query->orderBy('id')
+                ->chunkById(1000, function ($locations) use ($output, $safeText): void {
+                    foreach ($locations as $location) {
+                        fputcsv($output, [
+                            $safeText($location->provinsi),
+                            $safeText($location->kabupaten_kota),
+                            $safeText($location->kecamatan),
+                            $safeText($location->desa),
+                            $location->latitude,
+                            $location->longitude,
+                            $location->date,
+                            $location->confidence,
+                        ], ',', '"', '');
+                    }
+                });
+
+            fclose($output);
+        }, "data-titik-lokasi-ember-{$filenameSuffix}.csv", [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 

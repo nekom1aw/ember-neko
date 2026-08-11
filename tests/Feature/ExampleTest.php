@@ -43,6 +43,14 @@ class ExampleTest extends TestCase
             ->assertSee('id="map-drilldown-control"', false)
             ->assertSee('id="map-boundary-breadcrumb"', false)
             ->assertSee('id="map-status-filter"', false)
+            ->assertSee('id="map-status-filter" class="absolute bottom-28 left-3', false)
+            ->assertSee('id="map-statistics-panel"', false)
+            ->assertSee('id="map-yearly-donut"', false)
+            ->assertSee('id="map-monthly-statistics" class="hidden', false)
+            ->assertSee('data-map-month-bar="0"', false)
+            ->assertSee('data-map-month-bar="11"', false)
+            ->assertSee('Statistik status')
+            ->assertSee('Status per bulan')
             ->assertSee('data-map-status="high"', false)
             ->assertSee('data-map-status="unrated"', false)
             ->assertSee('Pilih semua')
@@ -71,7 +79,9 @@ class ExampleTest extends TestCase
             ->assertSee(route('user.about', ['lang' => 'en']), false)
             ->assertSee(route('user.team', ['lang' => 'en']), false)
             ->assertSee('id="back-to-top"', false)
-            ->assertSee('header class="relative', false)
+            ->assertSee('<body class="flex min-h-screen flex-col', false)
+            ->assertSee('<main class="flex-1">', false)
+            ->assertSee('header class="relative z-[1000]', false)
             ->assertDontSee('header class="sticky', false)
             ->assertSee('Recently added data');
     }
@@ -90,6 +100,62 @@ class ExampleTest extends TestCase
             ->assertSee('Suka Maju')
             ->assertSee('Hasil pencarian')
             ->assertDontSee('>CMS<', false);
+    }
+
+    public function test_public_can_download_location_data_as_csv(): void
+    {
+        DB::table('titik_lokasi')->insert([
+            [
+                'provinsi' => 'Sumatera Selatan',
+                'kabupaten_kota' => 'Palembang',
+                'kecamatan' => 'Ilir Timur I',
+                'desa' => '20 Ilir D III',
+                'latitude' => -2.976073,
+                'longitude' => 104.775431,
+                'date' => '2025-04-12',
+                'confidence' => 'high',
+            ],
+            [
+                'provinsi' => 'Aceh',
+                'kabupaten_kota' => 'Banda Aceh',
+                'kecamatan' => 'Kuta Alam',
+                'desa' => 'Kuta Alam',
+                'latitude' => 5.5483,
+                'longitude' => 95.3238,
+                'date' => '2024-02-10',
+                'confidence' => 'medium',
+            ],
+        ]);
+
+        $response = $this->get(route('user.data.download'));
+
+        $response
+            ->assertOk()
+            ->assertDownload('data-titik-lokasi-ember-semua.csv');
+
+        $content = $response->streamedContent();
+        $this->assertStringContainsString('provinsi,kabupaten_kota,kecamatan,desa,latitude,longitude,date,confidence', $content);
+        $rows = array_values(array_filter(preg_split('/\R/', $content)));
+        $location = str_getcsv($rows[1], ',', '"', '');
+        $this->assertSame(['Sumatera Selatan', 'Palembang', 'Ilir Timur I', '20 Ilir D III'], array_slice($location, 0, 4));
+
+        $this->get(route('user.data.index', ['lang' => 'id']))
+            ->assertOk()
+            ->assertSee('Semua data')
+            ->assertSee('Per tahun')
+            ->assertSee('Per provinsi')
+            ->assertSee('2025')
+            ->assertSee('Sumatera Selatan');
+
+        $yearResponse = $this->get(route('user.data.download', ['scope' => 'year', 'year' => 2025]));
+        $yearResponse->assertDownload('data-titik-lokasi-ember-2025.csv');
+        $this->assertStringContainsString('20 Ilir D III', $yearResponse->streamedContent());
+        $this->assertStringNotContainsString('Kuta Alam', $yearResponse->streamedContent());
+
+        $provinceResponse = $this->get(route('user.data.download', ['scope' => 'province', 'province' => 'Aceh']));
+        $provinceResponse->assertDownload('data-titik-lokasi-ember-aceh.csv');
+        $this->assertStringContainsString('Kuta Alam', $provinceResponse->streamedContent());
+        $this->assertStringNotContainsString('20 Ilir D III', $provinceResponse->streamedContent());
     }
 
     public function test_map_year_filter_uses_the_available_date_range(): void

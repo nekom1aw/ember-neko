@@ -16,6 +16,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [DashboardController::class, 'index'])
     ->name('user.dashboard');
 Route::get('/map', [ContentController::class, 'map'])->name('user.map');
+Route::get('/data', [ContentController::class, 'data'])->name('user.data.index');
+Route::get('/data/titik-lokasi.csv', [ContentController::class, 'downloadLocationCsv'])->name('user.data.download');
 Route::get('/statistics', [ContentController::class, 'statistics'])->name('user.statistics');
 Route::get('/locations/{id}', [ContentController::class, 'location'])->name('user.locations.show');
 Route::get('/search', [ContentController::class, 'search'])->name('user.search');

@@ -47,7 +47,7 @@ const EmberMap = {
             scrollWheelZoom: false,
         }).setView([-2.5, 118], 5);
 
-        ['map-year-filter', 'map-status-filter', 'map-drilldown-control'].forEach((controlId) => {
+        ['map-year-filter', 'map-status-filter', 'map-drilldown-control', 'map-statistics-panel'].forEach((controlId) => {
             const control = document.getElementById(controlId);
             if (!control) return;
 
@@ -77,6 +77,7 @@ const EmberMap = {
             this.handleBoundaryClick(event);
             this.closeLocationDetail();
         });
+        this.updateMapStatistics();
     },
 
     async renderBoundaryLayers(layers) {
@@ -161,6 +162,7 @@ const EmberMap = {
 
             this.rerenderBoundaryLayers();
             this.updateBoundaryDrilldownUi();
+            this.updateMapStatistics();
         });
 
         this.updateBoundaryDrilldownUi();
@@ -319,6 +321,7 @@ const EmberMap = {
 
         this.rerenderBoundaryLayers();
         this.updateBoundaryDrilldownUi();
+        this.updateMapStatistics();
 
         const levelOrder = ['province', 'regency', 'district', 'village'];
         const nextLevel = levelOrder[levelOrder.indexOf(level) + 1];
@@ -364,6 +367,7 @@ const EmberMap = {
         this.focusedLocationLabel = null;
         this.rerenderBoundaryLayers();
         this.updateBoundaryDrilldownUi();
+        this.updateMapStatistics();
         this.map.fitBounds([[-6.5, 94.5], [6.5, 106.5]], { padding: [36, 36], maxZoom: 6 });
     },
 
@@ -498,6 +502,7 @@ const EmberMap = {
 
         this.rerenderBoundaryLayers();
         this.updateBoundaryDrilldownUi();
+        this.updateMapStatistics();
 
         const villageLayer = this.boundaryLayers.find(({ definition }) => definition.level === 'village');
         const targetZoom = villageLayer
@@ -593,7 +598,123 @@ const EmberMap = {
         });
 
         this.renderMarkers(filteredLocations, { fitView: false });
+        this.updateMapStatistics();
         this.closeLocationDetail();
+    },
+
+    updateMapStatistics() {
+        const panel = document.getElementById('map-statistics-panel');
+        const donut = document.getElementById('map-yearly-donut');
+        const totalElement = document.getElementById('map-yearly-total');
+        const regionElement = document.getElementById('map-statistics-region');
+        const periodElement = document.getElementById('map-statistics-period');
+        const monthlySection = document.getElementById('map-monthly-statistics');
+
+        if (!panel || !donut || !totalElement || !regionElement || !periodElement || !monthlySection) {
+            return;
+        }
+
+        const statusDefinitions = {
+            high: { color: '#b91c1c' },
+            medium: { color: '#d97706' },
+            low: { color: '#047857' },
+            unrated: { color: '#334155' },
+        };
+        const normalizeRegion = (value) => String(value || '').trim().toLocaleLowerCase('id-ID');
+        const selectedProvince = this.boundarySelection.province;
+        const selectedProvinceKey = normalizeRegion(selectedProvince);
+        const formatter = new Intl.NumberFormat(this.language === 'en' ? 'en-US' : 'id-ID');
+        const regionLocations = this.locations.filter((location) => {
+            const matchesProvince = !selectedProvinceKey
+                || normalizeRegion(location.provinsi) === selectedProvinceKey;
+            const status = this.statusFor(location.confidence);
+
+            return matchesProvince && this.activeStatusKeys.has(status.key);
+        });
+        const periodLocations = regionLocations.filter((location) => this.selectedYear === 'all'
+            || (location.date && String(location.date).slice(0, 4) === String(this.selectedYear))
+        );
+        const counts = Object.fromEntries(Object.keys(statusDefinitions).map((key) => [key, 0]));
+
+        periodLocations.forEach((location) => {
+            counts[this.statusFor(location.confidence).key] += 1;
+        });
+
+        const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+        let offset = 0;
+        const stops = Object.entries(statusDefinitions).map(([key, definition]) => {
+            const start = offset;
+            offset += total > 0 ? (counts[key] / total) * 100 : 0;
+
+            return `${definition.color} ${start}% ${offset}%`;
+        });
+
+        donut.style.background = total > 0
+            ? `conic-gradient(${stops.join(', ')})`
+            : 'conic-gradient(#e2e8f0 0% 100%)';
+        donut.setAttribute('aria-label', `${selectedProvince || 'Sumatera'}, ${this.selectedYear}: ${formatter.format(total)}`);
+        totalElement.textContent = formatter.format(total);
+        regionElement.textContent = selectedProvince || 'Sumatera';
+        periodElement.textContent = this.selectedYear === 'all'
+            ? (this.language === 'en' ? 'All years' : 'Semua tahun')
+            : String(this.selectedYear);
+
+        Object.entries(counts).forEach(([key, count]) => {
+            const countElement = panel.querySelector(`[data-map-yearly-count="${key}"]`);
+            if (countElement) countElement.textContent = formatter.format(count);
+        });
+
+        const showMonthly = this.selectedYear !== 'all';
+        monthlySection.classList.toggle('hidden', !showMonthly);
+
+        if (!showMonthly) {
+            return;
+        }
+
+        const monthlyCounts = Array.from({ length: 12 }, () => ({
+            high: 0,
+            medium: 0,
+            low: 0,
+            unrated: 0,
+        }));
+
+        periodLocations.forEach((location) => {
+            const month = Number(String(location.date || '').slice(5, 7));
+            if (month < 1 || month > 12) return;
+
+            monthlyCounts[month - 1][this.statusFor(location.confidence).key] += 1;
+        });
+
+        const monthlyTotals = monthlyCounts.map((monthCounts) =>
+            Object.values(monthCounts).reduce((sum, count) => sum + count, 0)
+        );
+        const maxMonthlyTotal = Math.max(1, ...monthlyTotals);
+
+        monthlyCounts.forEach((monthCounts, monthIndex) => {
+            const bar = panel.querySelector(`[data-map-month-bar="${monthIndex}"]`);
+            if (!bar) return;
+
+            const monthTotal = monthlyTotals[monthIndex];
+            bar.replaceChildren();
+            bar.style.height = monthTotal > 0 ? `${Math.max(5, (monthTotal / maxMonthlyTotal) * 100)}%` : '0';
+            bar.title = `${formatter.format(monthTotal)} ${this.language === 'en' ? 'locations' : 'lokasi'}`;
+
+            Object.entries(statusDefinitions).forEach(([key, definition]) => {
+                const count = monthCounts[key];
+                if (count === 0) return;
+
+                const segment = document.createElement('span');
+                segment.style.height = `${(count / monthTotal) * 100}%`;
+                segment.style.background = definition.color;
+                segment.title = `${key}: ${formatter.format(count)}`;
+                bar.append(segment);
+            });
+        });
+
+        const monthlyTitle = document.getElementById('map-monthly-title');
+        const monthlyTotal = document.getElementById('map-monthly-total');
+        if (monthlyTitle) monthlyTitle.textContent = `${selectedProvince || 'Sumatera'} · ${this.selectedYear}`;
+        if (monthlyTotal) monthlyTotal.textContent = formatter.format(total);
     },
 
     statusFor(confidence) {

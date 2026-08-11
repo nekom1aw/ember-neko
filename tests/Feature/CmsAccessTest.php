@@ -81,6 +81,7 @@ class CmsAccessTest extends TestCase
         $this->get(route('user.about', ['lang' => 'id']))
             ->assertOk()
             ->assertSee('Sistem pemantauan dini.')
+            ->assertDontSee('Tentang EMBER')
             ->assertDontSee('Gambar belum tersedia');
 
         $this->actingAs($admin)
@@ -128,22 +129,27 @@ class CmsAccessTest extends TestCase
 
         $this->get(route('user.methodology', ['lang' => 'id']))
             ->assertOk()
-            ->assertSee('Penjelasan dalam bahasa Indonesia.');
+            ->assertSee('Penjelasan dalam bahasa Indonesia.')
+            ->assertDontSee('Metodologi EMBER');
 
         $this->get(route('user.methodology', ['lang' => 'en']))
             ->assertOk()
-            ->assertSee('Explanation in English.');
+            ->assertSee('Explanation in English.')
+            ->assertDontSee('EMBER Methodology');
     }
 
     public function test_public_navigation_labels_follow_selected_language(): void
     {
         $this->get(route('user.dashboard', ['lang' => 'id']))
             ->assertOk()
-            ->assertSeeInOrder(['Beranda', 'Peta', 'Statistik', 'Tentang', 'Metodologi', 'Tim']);
+            ->assertSeeInOrder(['Beranda', 'Peta &amp; Data', 'Statistik', 'Tentang', 'Metodologi', 'Tim'], false)
+            ->assertSee('Unduh Data')
+            ->assertSee(route('user.data.index', ['lang' => 'id']), false);
 
         $this->get(route('user.dashboard', ['lang' => 'en']))
             ->assertOk()
-            ->assertSeeInOrder(['Home', 'Map', 'Statistics', 'About', 'Methodology', 'Team']);
+            ->assertSeeInOrder(['Home', 'Map &amp; Data', 'Statistics', 'About', 'Methodology', 'Team'], false)
+            ->assertSee('Data Download');
     }
 
     public function test_authenticated_admin_can_edit_location_details(): void

@@ -9,22 +9,31 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
 </head>
-<body class="min-h-screen bg-[#f7f8fa] text-slate-900 antialiased selection:bg-red-100 selection:text-red-900">
+<body class="flex min-h-screen flex-col bg-[#f7f8fa] text-slate-900 antialiased selection:bg-red-100 selection:text-red-900">
     @php($currentLanguage = request('lang') === 'en' ? 'en' : 'id')
     <div class="relative z-[70] bg-slate-950 px-4 py-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-slate-300">
         <span class="mr-2 inline-block size-1.5 rounded-full bg-red-500 align-middle shadow-[0_0_10px_rgba(239,68,68,.9)]"></span>
         Early Monitoring for Burning Environment Response
     </div>
-    <header class="relative z-[60] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,.04)] backdrop-blur-xl">
+    <header class="relative z-[1000] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_12px_rgba(15,23,42,.04)] backdrop-blur-xl">
         <nav class="mx-auto flex min-h-17 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8" aria-label="{{ $currentLanguage === 'en' ? 'Main navigation' : 'Navigasi utama' }}">
             <a href="{{ route('user.dashboard', ['lang' => $currentLanguage]) }}" class="flex shrink-0 items-center gap-3">
                 <img src="{{ asset('images/ember-logo.png') }}" alt="EMBER - Early Monitoring for Burning Environment Response" class="h-16 w-16 shrink-0 object-contain sm:h-20 sm:w-20">
             </a>
 
             <div class="hidden items-center gap-1 rounded-xl bg-slate-100/80 p-1 text-xs font-bold text-slate-600 lg:flex">
+                <a href="{{ route('user.dashboard', ['lang' => $currentLanguage]) }}" class="rounded-lg px-3 py-2 transition {{ request()->routeIs('user.dashboard') ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/70' : 'hover:bg-white/70 hover:text-slate-950' }}">{{ $currentLanguage === 'en' ? 'Home' : 'Beranda' }}</a>
+                <details class="group relative">
+                    <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-3 py-2 marker:content-none {{ request()->routeIs('user.map') || request()->routeIs('user.data.*') ? 'bg-white text-red-600 shadow-sm ring-1 ring-slate-200/70' : 'hover:bg-white/70 hover:text-slate-950' }}">
+                        {{ $currentLanguage === 'en' ? 'Map & Data' : 'Peta & Data' }}
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" class="size-3 transition group-open:rotate-180" aria-hidden="true"><path d="m5 7.5 5 5 5-5"/></svg>
+                    </summary>
+                    <div class="absolute left-0 top-11 z-[90] w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-950/15">
+                        <a href="{{ route('user.map', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-red-600">{{ $currentLanguage === 'en' ? 'Interactive Map' : 'Peta Interaktif' }}</a>
+                        <a href="{{ route('user.data.index', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-3 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-red-600">{{ $currentLanguage === 'en' ? 'Data Download' : 'Unduh Data' }}</a>
+                    </div>
+                </details>
                 @foreach ([
-                    ['user.dashboard', $currentLanguage === 'en' ? 'Home' : 'Beranda'],
-                    ['user.map', $currentLanguage === 'en' ? 'Map' : 'Peta'],
                     ['user.statistics', $currentLanguage === 'en' ? 'Statistics' : 'Statistik'],
                     ['user.about', $currentLanguage === 'en' ? 'About' : 'Tentang'],
                     ['user.methodology', $currentLanguage === 'en' ? 'Methodology' : 'Metodologi'],
@@ -56,7 +65,16 @@
                     </summary>
                     <div class="absolute right-0 top-12 z-[80] w-72 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-950/15">
                         <a href="{{ route('user.dashboard', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Home' : 'Beranda' }}</a>
-                        <a href="{{ route('user.map', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Interactive Map' : 'Peta Interaktif' }}</a>
+                        <details class="group">
+                            <summary class="flex cursor-pointer list-none items-center justify-between rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50 marker:content-none">
+                                {{ $currentLanguage === 'en' ? 'Map & Data' : 'Peta & Data' }}
+                                <span class="transition group-open:rotate-180">⌄</span>
+                            </summary>
+                            <div class="mx-3 mb-2 border-l-2 border-red-200 pl-2">
+                                <a href="{{ route('user.map', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Interactive Map' : 'Peta Interaktif' }}</a>
+                                <a href="{{ route('user.data.index', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-3 py-2.5 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Data Download' : 'Unduh Data' }}</a>
+                            </div>
+                        </details>
                         <a href="{{ route('user.statistics', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Statistics' : 'Statistik' }}</a>
                         <a href="{{ route('user.about', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'About' : 'Tentang' }}</a>
                         <a href="{{ route('user.methodology', ['lang' => $currentLanguage]) }}" class="block rounded-lg px-4 py-3 text-sm font-semibold hover:bg-slate-50">{{ $currentLanguage === 'en' ? 'Methodology' : 'Metodologi' }}</a>
@@ -78,7 +96,7 @@
         </nav>
     </header>
 
-    <main>
+    <main class="flex-1">
         @yield('content')
     </main>
 
@@ -96,6 +114,7 @@
                 <a href="{{ route('user.methodology', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Methodology' : 'Metodologi' }}</a>
                 <a href="{{ route('user.team', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Team' : 'Tim' }}</a>
                 <a href="{{ route('user.map', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Map' : 'Peta' }}</a>
+                <a href="{{ route('user.data.index', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Data' : 'Data' }}</a>
                 <a href="{{ route('user.statistics', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Statistics' : 'Statistik' }}</a>
                 <a href="{{ route('user.activities', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">{{ $currentLanguage === 'en' ? 'Activities' : 'Aktivitas' }}</a>
                 <a href="{{ route('user.faq', ['lang' => $currentLanguage]) }}" class="hover:text-red-600">FAQ</a>
