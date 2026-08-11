@@ -161,9 +161,8 @@ class LocationCsvImport extends Component
                     $row[$column] = $value === '' ? null : $value;
                 }
 
-                $isIndonesianLocation = $row['provinsi'] !== null;
-                $row['latitude'] = $this->normalizeCoordinate($row['latitude'], false, $isIndonesianLocation);
-                $row['longitude'] = $this->normalizeCoordinate($row['longitude'], true, $isIndonesianLocation);
+                $row['latitude'] = $this->normalizeCoordinate($row['latitude'], false);
+                $row['longitude'] = $this->normalizeCoordinate($row['longitude'], true);
                 $row['date'] = $this->normalizeDate($row['date']);
 
                 if ($row['latitude'] === null && $row['longitude'] === null) {
@@ -215,7 +214,7 @@ class LocationCsvImport extends Component
         );
     }
 
-    private function normalizeCoordinate(?string $value, bool $isLongitude, bool $isIndonesianLocation): ?string
+    private function normalizeCoordinate(?string $value, bool $isLongitude): ?string
     {
         if ($value === null) {
             return null;
@@ -240,7 +239,7 @@ class LocationCsvImport extends Component
             $value = str_replace('.', '', $value);
         }
 
-        if ($isIndonesianLocation && is_numeric($value)) {
+        if (is_numeric($value)) {
             $coordinate = (float) $value;
 
             if ($isLongitude && ($hasRepeatedThousandsSeparators || abs($coordinate) >= 900)) {

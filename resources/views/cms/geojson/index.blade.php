@@ -11,8 +11,9 @@
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[380px_1fr]">
-            <form method="POST" action="{{ route('cms.geojson.store') }}" enctype="multipart/form-data" class="h-fit bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <form id="geojson-upload-form" method="POST" action="{{ route('cms.geojson.store') }}" enctype="multipart/form-data" class="h-fit bg-white p-6 shadow-sm ring-1 ring-slate-200">
                 @csrf
+                <input id="geojson-upload-token" type="hidden" name="upload_token" value="{{ old('upload_token') }}">
                 <h2 class="text-lg font-bold text-slate-900">Upload layer wilayah</h2>
 
                 <div class="mt-5 space-y-5">
@@ -31,7 +32,18 @@
                     <div>
                         <label for="geojson" class="block text-sm font-semibold text-slate-700">File PMTiles / GeoJSON</label>
                         <input id="geojson" name="geojson" type="file" accept=".pmtiles,.geojson,.json,application/vnd.pmtiles,application/geo+json,application/json" required class="mt-2 block w-full border border-slate-300 bg-white p-3 text-sm text-slate-600 file:mr-4 file:border-0 file:bg-slate-900 file:px-4 file:py-2 file:text-xs file:font-bold file:text-white">
-                        <p class="mt-2 text-xs leading-5 text-slate-500">Disarankan `.pmtiles` versi 3 untuk batas kecamatan. Maksimal 700 MB; peta hanya mengambil tile yang sedang terlihat.</p>
+                        <p class="mt-2 text-xs leading-5 text-slate-500">Disarankan `.pmtiles` versi 3 untuk batas kecamatan. Maksimal 700 MB; file besar dikirim bertahap agar tidak terkena batas server.</p>
+                        <div id="geojson-upload-progress" class="mt-3 hidden" aria-live="polite">
+                            <div class="flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
+                                <span id="geojson-upload-status">Menyiapkan upload...</span>
+                                <span id="geojson-upload-percent">0%</span>
+                            </div>
+                            <div class="mt-2 h-2 overflow-hidden bg-slate-100">
+                                <div id="geojson-upload-bar" class="h-full w-0 bg-red-600 transition-[width] duration-200"></div>
+                            </div>
+                            <p class="mt-2 text-[11px] text-slate-500">Jangan tutup halaman sampai proses selesai.</p>
+                        </div>
+                        <p id="geojson-upload-error" class="mt-2 hidden text-sm font-semibold text-red-600"></p>
                         @error('geojson')<p class="mt-2 text-sm text-red-600">{{ $message }}</p>@enderror
                     </div>
 
@@ -66,7 +78,7 @@
                     <p class="text-xs leading-5 text-slate-500">GeoJSON tetap dapat diunggah sebagai arsip, tetapi tidak diaktifkan pada peta karena terlalu berat.</p>
                 </div>
 
-                <button type="submit" class="mt-6 w-full border border-red-600 bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-500">Simpan layer</button>
+                <button id="geojson-upload-submit" type="submit" class="mt-6 w-full border border-red-600 bg-red-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-red-500 disabled:cursor-wait disabled:opacity-60">Simpan layer</button>
             </form>
 
             <div>
@@ -147,3 +159,102 @@
         </div>
     </div>
 @endsection
+
+@push('scripts')
+<script>
+    (() => {
+        const form = document.getElementById('geojson-upload-form');
+        const fileInput = document.getElementById('geojson');
+        const tokenInput = document.getElementById('geojson-upload-token');
+        const submitButton = document.getElementById('geojson-upload-submit');
+        const progress = document.getElementById('geojson-upload-progress');
+        const progressBar = document.getElementById('geojson-upload-bar');
+        const progressStatus = document.getElementById('geojson-upload-status');
+        const progressPercent = document.getElementById('geojson-upload-percent');
+        const errorElement = document.getElementById('geojson-upload-error');
+
+        if (!form || !fileInput) return;
+
+        fileInput.addEventListener('change', () => {
+            tokenInput.value = '';
+            errorElement.classList.add('hidden');
+        });
+
+        form.addEventListener('submit', async (event) => {
+            const file = fileInput.files?.[0];
+
+            if (!file || tokenInput.value) return;
+
+            event.preventDefault();
+
+            const maxBytes = 700 * 1024 * 1024;
+            if (file.size > maxBytes) {
+                errorElement.textContent = 'Ukuran file melebihi batas 700 MB.';
+                errorElement.classList.remove('hidden');
+                return;
+            }
+
+            const allowedExtensions = ['pmtiles', 'geojson', 'json'];
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            if (!allowedExtensions.includes(extension)) {
+                errorElement.textContent = 'Gunakan file .pmtiles, .geojson, atau .json.';
+                errorElement.classList.remove('hidden');
+                return;
+            }
+
+            const chunkSize = 512 * 1024;
+            const totalChunks = Math.ceil(file.size / chunkSize);
+            const uploadId = globalThis.crypto?.randomUUID?.()
+                ?? `${Date.now()}-${Math.random().toString(16).slice(2)}-ember-upload`;
+
+            submitButton.disabled = true;
+            fileInput.disabled = true;
+            progress.classList.remove('hidden');
+            errorElement.classList.add('hidden');
+
+            try {
+                for (let index = 0; index < totalChunks; index++) {
+                    const body = new FormData();
+                    const start = index * chunkSize;
+                    const chunk = file.slice(start, Math.min(start + chunkSize, file.size));
+                    body.append('upload_id', uploadId);
+                    body.append('chunk_index', String(index));
+                    body.append('total_chunks', String(totalChunks));
+                    body.append('original_name', file.name);
+                    body.append('chunk', chunk, `${file.name}.part`);
+
+                    const response = await fetch(@json(route('cms.geojson.upload-chunk')), {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': @json(csrf_token()),
+                        },
+                        credentials: 'same-origin',
+                        body,
+                    });
+
+                    const payload = await response.json().catch(() => ({}));
+                    if (!response.ok) {
+                        throw new Error(payload.message || payload.errors?.chunk?.[0] || `Upload gagal (${response.status}).`);
+                    }
+
+                    const percent = Math.round(((index + 1) / totalChunks) * 100);
+                    progressBar.style.width = `${percent}%`;
+                    progressPercent.textContent = `${percent}%`;
+                    progressStatus.textContent = `Mengunggah bagian ${index + 1} dari ${totalChunks}`;
+                }
+
+                tokenInput.value = uploadId;
+                progressStatus.textContent = 'Upload selesai, menyimpan layer...';
+                form.submit();
+            } catch (error) {
+                fileInput.disabled = false;
+                submitButton.disabled = false;
+                errorElement.textContent = error.message || 'Upload gagal. Periksa koneksi lalu coba kembali.';
+                errorElement.classList.remove('hidden');
+                progressStatus.textContent = 'Upload terhenti';
+            }
+        });
+    })();
+</script>
+@endpush

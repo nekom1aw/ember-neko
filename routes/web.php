@@ -50,6 +50,7 @@ Route::prefix('cms')->name('cms.')->group(function () {
         Route::delete('/reference/{id}', [ReferenceController::class, 'destroy'])->name('references.destroy');
 
         Route::get('/geojson', [GeoJsonController::class, 'index'])->name('geojson.index');
+        Route::post('/geojson/upload-chunk', [GeoJsonController::class, 'uploadChunk'])->name('geojson.upload-chunk');
         Route::post('/geojson', [GeoJsonController::class, 'store'])->name('geojson.store');
         Route::patch('/geojson/{id}', [GeoJsonController::class, 'update'])->name('geojson.update');
         Route::delete('/geojson/{id}', [GeoJsonController::class, 'destroy'])->name('geojson.destroy');

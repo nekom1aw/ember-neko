@@ -30,6 +30,8 @@ class Dashboard extends Component
             'locations' => $locations,
             'totalLocations' => $locations->count(),
             'totalWarnings' => $locations->whereNotNull('confidence')->count(),
+            'latestLocations' => $locations->sortByDesc('date')->take(4)->values(),
+            'latestDate' => $locations->pluck('date')->filter()->max(),
             'highWarnings' => $locations->filter(function ($location) {
                 $confidence = strtolower(trim((string) $location->confidence));
 

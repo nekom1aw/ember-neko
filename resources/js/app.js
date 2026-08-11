@@ -747,3 +747,102 @@ const initializeRichContentSliders = () => {
 
 document.addEventListener('DOMContentLoaded', initializeRichContentSliders);
 document.addEventListener('livewire:navigated', initializeRichContentSliders);
+
+const initializeRevealMotion = () => {
+    const elements = document.querySelectorAll('[data-reveal]:not([data-motion-ready])');
+
+    if (elements.length === 0) return;
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+        elements.forEach((element) => element.classList.add('is-visible'));
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+        });
+    }, {
+        threshold: 0.12,
+        rootMargin: '0px 0px -40px',
+    });
+
+    elements.forEach((element) => {
+        element.dataset.motionReady = 'true';
+        const delay = Number(element.dataset.revealDelay || 0);
+        element.style.setProperty('--reveal-delay', `${Math.max(0, Math.min(delay, 500))}ms`);
+        observer.observe(element);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initializeRevealMotion);
+document.addEventListener('livewire:navigated', initializeRevealMotion);
+
+const initializeTeamCarousel = () => {
+    document.querySelectorAll('[data-team-carousel]:not([data-initialized])').forEach((carousel) => {
+        const cards = Array.from(carousel.querySelectorAll('[data-team-card]'));
+        if (cards.length === 0) return;
+
+        carousel.dataset.initialized = 'true';
+        let activeIndex = 0;
+        let touchStartX = null;
+
+        const update = () => {
+            cards.forEach((card, index) => {
+                let offset = index - activeIndex;
+                if (offset > cards.length / 2) offset -= cards.length;
+                if (offset < -cards.length / 2) offset += cards.length;
+
+                let position = 'hidden';
+                if (offset === 0) position = 'active';
+                else if (offset === -1) position = 'prev';
+                else if (offset === 1) position = 'next';
+                else if (offset === -2) position = 'prev-far';
+                else if (offset === 2) position = 'next-far';
+
+                card.dataset.position = position;
+                card.setAttribute('aria-hidden', position === 'active' ? 'false' : 'true');
+                card.tabIndex = position === 'active' ? 0 : -1;
+            });
+
+            const counter = carousel.querySelector('[data-team-current]');
+            if (counter) counter.textContent = String(activeIndex + 1).padStart(2, '0');
+        };
+
+        const move = (direction) => {
+            activeIndex = (activeIndex + direction + cards.length) % cards.length;
+            update();
+        };
+
+        carousel.querySelector('[data-team-prev]')?.addEventListener('click', () => move(-1));
+        carousel.querySelector('[data-team-next]')?.addEventListener('click', () => move(1));
+        cards.forEach((card, index) => card.addEventListener('click', () => {
+            if (index !== activeIndex) {
+                activeIndex = index;
+                update();
+            }
+        }));
+
+        carousel.addEventListener('keydown', (event) => {
+            if (event.key === 'ArrowLeft') move(-1);
+            if (event.key === 'ArrowRight') move(1);
+        });
+        carousel.addEventListener('touchstart', (event) => {
+            touchStartX = event.changedTouches[0]?.clientX ?? null;
+        }, { passive: true });
+        carousel.addEventListener('touchend', (event) => {
+            if (touchStartX === null) return;
+            const distance = (event.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+            if (Math.abs(distance) > 45) move(distance > 0 ? -1 : 1);
+            touchStartX = null;
+        }, { passive: true });
+
+        update();
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initializeTeamCarousel);
+document.addEventListener('livewire:navigated', initializeTeamCarousel);

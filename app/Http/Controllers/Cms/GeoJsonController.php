@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Cms;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -14,6 +17,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GeoJsonController extends Controller
 {
+    private const MAX_UPLOAD_KILOBYTES = 716800;
+
     public function index(): View
     {
         return view('cms.geojson.index', [
@@ -26,12 +31,28 @@ class GeoJsonController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'geojson' => ['required', 'file', 'max:716800'],
+            'geojson' => ['nullable', 'required_without:upload_token', 'file', 'max:'.self::MAX_UPLOAD_KILOBYTES],
+            'upload_token' => ['nullable', 'required_without:geojson', 'string', 'regex:/^[A-Za-z0-9-]{20,64}$/'],
             'administrative_level' => ['required', 'in:province,regency,district,village,other'],
             'min_zoom' => ['nullable', 'integer', 'min:0', 'max:22'],
             'max_zoom' => ['nullable', 'integer', 'min:0', 'max:22', 'gte:min_zoom'],
+        ], [
+            'geojson.uploaded' => 'File gagal diterima oleh PHP. Muat ulang halaman lalu unggah kembali agar file dikirim bertahap.',
+            'geojson.required_without' => 'Pilih file PMTiles, GeoJSON, atau JSON.',
+            'geojson.file' => 'Berkas layer yang dipilih tidak dapat dibaca sebagai file.',
+            'geojson.max' => 'Ukuran file layer melebihi batas 700 MB.',
+            'upload_token.required_without' => 'Pilih file layer yang akan diunggah.',
         ]);
-        $file = $request->file('geojson');
+        [$file, $chunkPaths] = $request->filled('upload_token')
+            ? $this->resolveChunkedUpload($request->string('upload_token')->toString())
+            : [$request->file('geojson'), []];
+
+        if (! $file instanceof UploadedFile || ! $file->isValid()) {
+            throw ValidationException::withMessages([
+                'geojson' => 'File gagal diterima server. Coba unggah ulang melalui upload bertahap.',
+            ]);
+        }
+
         $extension = strtolower($file->getClientOriginalExtension());
 
         if (! in_array($extension, ['geojson', 'json', 'pmtiles'], true)) {
@@ -46,6 +67,12 @@ class GeoJsonController extends Controller
             : $this->inspectGeoJson($file->getRealPath(), $file->getSize());
 
         $filePath = $file->storeAs($fileFormat, Str::uuid().'.'.$extension, 'public');
+
+        if (! is_string($filePath) || $filePath === '') {
+            throw ValidationException::withMessages([
+                'geojson' => 'File tidak dapat disimpan. Periksa kapasitas dan izin folder storage di server.',
+            ]);
+        }
 
         DB::table('geojson_layers')->insert([
             'name' => $validated['name'],
@@ -64,7 +91,95 @@ class GeoJsonController extends Controller
             'updated_at' => now(),
         ]);
 
+        foreach ($chunkPaths as $chunkPath) {
+            File::delete($chunkPath);
+        }
+
         return back()->with('success', 'Layer '.strtoupper($fileFormat).' berhasil diunggah.');
+    }
+
+    public function uploadChunk(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'upload_id' => ['required', 'string', 'regex:/^[A-Za-z0-9-]{20,64}$/'],
+            'chunk_index' => ['required', 'integer', 'min:0', 'max:2500'],
+            'total_chunks' => ['required', 'integer', 'min:1', 'max:2500'],
+            'original_name' => ['required', 'string', 'max:255'],
+            'chunk' => ['required', 'file', 'max:1024'],
+        ], [
+            'chunk.uploaded' => 'Satu bagian file gagal diterima server. Coba unggah ulang.',
+            'chunk.file' => 'Bagian file tidak dapat dibaca server.',
+            'chunk.max' => 'Ukuran satu bagian file melebihi 1 MB.',
+        ]);
+
+        $chunk = $request->file('chunk');
+
+        if (! $chunk instanceof UploadedFile || ! $chunk->isValid()) {
+            return response()->json([
+                'message' => 'Potongan file gagal diterima server.',
+            ], 422);
+        }
+
+        $directory = storage_path('app/private/geojson-chunks/'.auth()->id());
+        File::ensureDirectoryExists($directory);
+
+        $uploadId = $validated['upload_id'];
+        $partPath = $directory.'/'.$uploadId.'.part';
+        $metaPath = $directory.'/'.$uploadId.'.json';
+        $chunkIndex = (int) $validated['chunk_index'];
+        $totalChunks = (int) $validated['total_chunks'];
+
+        if ($chunkIndex === 0) {
+            File::delete([$partPath, $metaPath]);
+            $meta = [
+                'original_name' => basename($validated['original_name']),
+                'total_chunks' => $totalChunks,
+                'received_chunks' => 0,
+            ];
+        } else {
+            $meta = is_file($metaPath) ? json_decode((string) file_get_contents($metaPath), true) : null;
+
+            if (! is_array($meta)
+                || (int) ($meta['received_chunks'] ?? -1) !== $chunkIndex
+                || (int) ($meta['total_chunks'] ?? -1) !== $totalChunks) {
+                return response()->json([
+                    'message' => 'Urutan upload tidak sesuai. Silakan mulai upload ulang.',
+                ], 409);
+            }
+        }
+
+        $input = fopen($chunk->getRealPath(), 'rb');
+        $output = fopen($partPath, $chunkIndex === 0 ? 'wb' : 'ab');
+
+        if ($input === false || $output === false) {
+            if (is_resource($input)) {
+                fclose($input);
+            }
+            if (is_resource($output)) {
+                fclose($output);
+            }
+
+            return response()->json(['message' => 'Server tidak dapat menulis file sementara.'], 500);
+        }
+
+        stream_copy_to_stream($input, $output);
+        fclose($input);
+        fclose($output);
+
+        if (filesize($partPath) > self::MAX_UPLOAD_KILOBYTES * 1024) {
+            File::delete([$partPath, $metaPath]);
+
+            return response()->json(['message' => 'Ukuran file melebihi batas 700 MB.'], 422);
+        }
+
+        $meta['received_chunks'] = $chunkIndex + 1;
+        file_put_contents($metaPath, json_encode($meta, JSON_THROW_ON_ERROR), LOCK_EX);
+
+        return response()->json([
+            'completed' => $meta['received_chunks'] === $totalChunks,
+            'received_chunks' => $meta['received_chunks'],
+            'total_chunks' => $totalChunks,
+        ]);
     }
 
     public function update(Request $request, int $id): RedirectResponse
@@ -187,6 +302,41 @@ class GeoJsonController extends Controller
         }
 
         return ['PMTiles v3', null];
+    }
+
+    private function resolveChunkedUpload(string $uploadId): array
+    {
+        $directory = storage_path('app/private/geojson-chunks/'.auth()->id());
+        $partPath = $directory.'/'.$uploadId.'.part';
+        $metaPath = $directory.'/'.$uploadId.'.json';
+        $meta = is_file($metaPath) ? json_decode((string) file_get_contents($metaPath), true) : null;
+
+        if (! is_file($partPath)
+            || ! is_array($meta)
+            || (int) ($meta['received_chunks'] ?? 0) !== (int) ($meta['total_chunks'] ?? -1)) {
+            throw ValidationException::withMessages([
+                'geojson' => 'Upload bertahap belum lengkap. Pilih file dan unggah kembali.',
+            ]);
+        }
+
+        $fileSize = filesize($partPath);
+
+        if ($fileSize === false || $fileSize <= 0 || $fileSize > self::MAX_UPLOAD_KILOBYTES * 1024) {
+            throw ValidationException::withMessages([
+                'geojson' => 'Ukuran file hasil upload tidak valid atau melebihi 700 MB.',
+            ]);
+        }
+
+        return [
+            new UploadedFile(
+                $partPath,
+                basename((string) $meta['original_name']),
+                null,
+                UPLOAD_ERR_OK,
+                true,
+            ),
+            [$partPath, $metaPath],
+        ];
     }
 
     private function inspectGeoJson(string $path, int $fileSize): array

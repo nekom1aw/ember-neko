@@ -6,7 +6,7 @@
                 Unduh template, isi data tanpa mengubah header, lalu unggah kembali. Latitude dan longitude wajib diisi; kolom lainnya boleh kosong.
             </p>
             <p class="mt-2 font-mono text-xs text-slate-500">provinsi, kabupaten_kota, kecamatan, desa, latitude, longitude, date, confidence</p>
-            <p class="mt-1 text-xs text-slate-500">Tanggal menerima HH/BB/TT (01/05/26) dan format ekspor B/H/TTTT (1/16/2021). Baris tanpa koordinat akan dilewati. Maksimal 5 MB atau 10.000 baris.</p>
+            <p class="mt-1 text-xs text-slate-500">Tanggal menerima HH/BB/TT (01/05/26) dan format ekspor B/H/TTTT (1/16/2021). Format koordinat spreadsheet Indonesia seperti 976.189 atau 1.010.151 akan dinormalisasi otomatis. Baris tanpa koordinat akan dilewati. Maksimal 5 MB atau 10.000 baris.</p>
         </div>
 
         <form wire:submit="importCsv" class="flex flex-col gap-3 sm:flex-row sm:items-end">

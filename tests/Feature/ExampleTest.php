@@ -60,12 +60,15 @@ class ExampleTest extends TestCase
     {
         $this->get('/?lang=en')
             ->assertOk()
-            ->assertSee('Monitor fire-prone locations on')
+            ->assertSee('images/ember-hero-v2.jpg', false)
+            ->assertSee('Early Monitoring for Burning Environment Response')
+            ->assertSee('Open interactive map')
             ->assertSee('Methodology')
             ->assertSee(route('user.about', ['lang' => 'en']), false)
             ->assertSee(route('user.team', ['lang' => 'en']), false)
             ->assertSee('id="back-to-top"', false)
-            ->assertDontSee('header class="sticky', false);
+            ->assertSee('header class="sticky', false)
+            ->assertSee('Recently added data');
     }
 
     public function test_public_search_finds_a_location_and_has_no_cms_button(): void

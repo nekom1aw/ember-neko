@@ -395,6 +395,29 @@ class CmsAccessTest extends TestCase
         ]);
     }
 
+    public function test_location_import_repairs_spreadsheet_coordinates_without_province(): void
+    {
+        $admin = User::factory()->create();
+        $csv = implode("\n", [
+            'provinsi,kabupaten_kota,kecamatan,desa,latitude,longitude,date,confidence',
+            ',,,,1.2832,976.189,,',
+            ',,,,-22.008,1.010.151,,',
+            ',,,,143,1.001.839,,',
+            ',,,,1.907,1.027.631,,',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(LocationCsvImport::class)
+            ->set('csvFile', UploadedFile::fake()->createWithContent('titik-lokasi.csv', $csv))
+            ->call('importCsv')
+            ->assertRedirect(route('cms.locations.index'));
+
+        $this->assertDatabaseHas('titik_lokasi', ['latitude' => 1.2832, 'longitude' => 97.6189]);
+        $this->assertDatabaseHas('titik_lokasi', ['latitude' => -2.2008, 'longitude' => 101.0151]);
+        $this->assertDatabaseHas('titik_lokasi', ['latitude' => 1.43, 'longitude' => 100.1839]);
+        $this->assertDatabaseHas('titik_lokasi', ['latitude' => 1.907, 'longitude' => 102.7631]);
+    }
+
     public function test_authenticated_admin_can_upload_and_delete_reference_photo(): void
     {
         Storage::fake('public');
@@ -438,6 +461,11 @@ class CmsAccessTest extends TestCase
                 ],
             ],
         ], JSON_THROW_ON_ERROR);
+
+        $this->actingAs($admin)
+            ->get(route('cms.geojson.index'))
+            ->assertOk()
+            ->assertSee('Mengunggah bagian');
 
         $this->actingAs($admin)
             ->post(route('cms.geojson.store'), [
@@ -519,5 +547,46 @@ class CmsAccessTest extends TestCase
             ->assertSee('map-layers\\/'.$layer->id, false)
             ->assertSee('"minZoom":6', false)
             ->assertSee('"maxZoom":10', false);
+    }
+
+    public function test_authenticated_admin_can_upload_geojson_in_small_chunks(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create();
+        $uploadId = 'ember-chunked-upload-1234567890';
+        $geojson = json_encode([
+            'type' => 'FeatureCollection',
+            'features' => [],
+        ], JSON_THROW_ON_ERROR);
+        $splitAt = (int) ceil(strlen($geojson) / 2);
+        $chunks = [substr($geojson, 0, $splitAt), substr($geojson, $splitAt)];
+
+        foreach ($chunks as $index => $contents) {
+            $this->actingAs($admin)
+                ->postJson(route('cms.geojson.upload-chunk'), [
+                    'upload_id' => $uploadId,
+                    'chunk_index' => $index,
+                    'total_chunks' => count($chunks),
+                    'original_name' => 'desa-sumatera.geojson',
+                    'chunk' => UploadedFile::fake()->createWithContent('chunk.part', $contents),
+                ])
+                ->assertOk()
+                ->assertJsonPath('received_chunks', $index + 1);
+        }
+
+        $this->actingAs($admin)
+            ->post(route('cms.geojson.store'), [
+                'name' => 'Desa Sumatera Chunked',
+                'upload_token' => $uploadId,
+                'administrative_level' => 'village',
+                'min_zoom' => 6,
+                'max_zoom' => 13,
+            ])
+            ->assertSessionHas('success');
+
+        $layer = DB::table('geojson_layers')->where('name', 'Desa Sumatera Chunked')->first();
+        $this->assertNotNull($layer);
+        $this->assertSame('FeatureCollection', $layer->geojson_type);
+        Storage::disk('public')->assertExists($layer->file_path);
     }
 }
