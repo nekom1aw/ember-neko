@@ -214,28 +214,45 @@
 
             try {
                 for (let index = 0; index < totalChunks; index++) {
-                    const body = new FormData();
                     const start = index * chunkSize;
                     const chunk = file.slice(start, Math.min(start + chunkSize, file.size));
-                    body.append('upload_id', uploadId);
-                    body.append('chunk_index', String(index));
-                    body.append('total_chunks', String(totalChunks));
-                    body.append('original_name', file.name);
-                    body.append('chunk', chunk, `${file.name}.part`);
+                    let uploaded = false;
+                    let lastError = 'Upload bagian gagal.';
 
-                    const response = await fetch(@json(route('cms.geojson.upload-chunk')), {
-                        method: 'POST',
-                        headers: {
-                            'Accept': 'application/json',
-                            'X-CSRF-TOKEN': @json(csrf_token()),
-                        },
-                        credentials: 'same-origin',
-                        body,
-                    });
+                    for (let attempt = 1; attempt <= 3 && !uploaded; attempt++) {
+                        const body = new FormData();
+                        body.append('upload_id', uploadId);
+                        body.append('chunk_index', String(index));
+                        body.append('total_chunks', String(totalChunks));
+                        body.append('original_name', file.name);
+                        body.append('chunk', chunk, `${file.name}.part`);
 
-                    const payload = await response.json().catch(() => ({}));
-                    if (!response.ok) {
-                        throw new Error(payload.message || payload.errors?.chunk?.[0] || `Upload gagal (${response.status}).`);
+                        try {
+                            const response = await fetch(@json(route('cms.geojson.upload-chunk')), {
+                                method: 'POST',
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': @json(csrf_token()),
+                                },
+                                credentials: 'same-origin',
+                                body,
+                            });
+
+                            const payload = await response.json().catch(() => ({}));
+                            uploaded = response.ok;
+                            lastError = payload.message || payload.errors?.chunk?.[0] || `Upload gagal (${response.status}).`;
+                        } catch (error) {
+                            lastError = error.message || 'Koneksi upload terputus.';
+                        }
+
+                        if (!uploaded && attempt < 3) {
+                            progressStatus.textContent = `Mengulang bagian ${index + 1} (percobaan ${attempt + 1}/3)...`;
+                            await new Promise((resolve) => setTimeout(resolve, attempt * 500));
+                        }
+                    }
+
+                    if (!uploaded) {
+                        throw new Error(lastError);
                     }
 
                     const percent = Math.round(((index + 1) / totalChunks) * 100);

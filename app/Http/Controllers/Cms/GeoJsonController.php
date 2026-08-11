@@ -92,7 +92,11 @@ class GeoJsonController extends Controller
         ]);
 
         foreach ($chunkPaths as $chunkPath) {
-            File::delete($chunkPath);
+            if (is_dir($chunkPath)) {
+                File::deleteDirectory($chunkPath);
+            } else {
+                File::delete($chunkPath);
+            }
         }
 
         return back()->with('success', 'Layer '.strtoupper($fileFormat).' berhasil diunggah.');
@@ -124,56 +128,79 @@ class GeoJsonController extends Controller
         File::ensureDirectoryExists($directory);
 
         $uploadId = $validated['upload_id'];
-        $partPath = $directory.'/'.$uploadId.'.part';
+        $partDirectory = $directory.'/'.$uploadId;
+        File::ensureDirectoryExists($partDirectory);
+
+        $assembledPath = $directory.'/'.$uploadId.'.part';
         $metaPath = $directory.'/'.$uploadId.'.json';
         $chunkIndex = (int) $validated['chunk_index'];
         $totalChunks = (int) $validated['total_chunks'];
+        $originalName = basename($validated['original_name']);
+        $meta = is_file($metaPath) ? json_decode((string) file_get_contents($metaPath), true) : null;
 
-        if ($chunkIndex === 0) {
-            File::delete([$partPath, $metaPath]);
+        if (! is_array($meta)) {
             $meta = [
-                'original_name' => basename($validated['original_name']),
+                'original_name' => $originalName,
                 'total_chunks' => $totalChunks,
-                'received_chunks' => 0,
             ];
-        } else {
-            $meta = is_file($metaPath) ? json_decode((string) file_get_contents($metaPath), true) : null;
-
-            if (! is_array($meta)
-                || (int) ($meta['received_chunks'] ?? -1) !== $chunkIndex
-                || (int) ($meta['total_chunks'] ?? -1) !== $totalChunks) {
-                return response()->json([
-                    'message' => 'Urutan upload tidak sesuai. Silakan mulai upload ulang.',
-                ], 409);
-            }
+        } elseif ((int) ($meta['total_chunks'] ?? -1) !== $totalChunks
+            || (string) ($meta['original_name'] ?? '') !== $originalName) {
+            return response()->json([
+                'message' => 'Metadata upload berbeda. Pilih ulang file untuk memulai sesi baru.',
+            ], 409);
         }
 
-        $input = fopen($chunk->getRealPath(), 'rb');
-        $output = fopen($partPath, $chunkIndex === 0 ? 'wb' : 'ab');
-
-        if ($input === false || $output === false) {
-            if (is_resource($input)) {
-                fclose($input);
-            }
-            if (is_resource($output)) {
-                fclose($output);
-            }
-
+        $chunkPath = $partDirectory.'/'.$chunkIndex.'.part';
+        if (! File::copy($chunk->getRealPath(), $chunkPath)) {
             return response()->json(['message' => 'Server tidak dapat menulis file sementara.'], 500);
         }
 
-        stream_copy_to_stream($input, $output);
-        fclose($input);
-        fclose($output);
+        $partPaths = [];
+        $totalSize = 0;
 
-        if (filesize($partPath) > self::MAX_UPLOAD_KILOBYTES * 1024) {
-            File::delete([$partPath, $metaPath]);
+        for ($index = 0; $index < $totalChunks; $index++) {
+            $path = $partDirectory.'/'.$index.'.part';
+
+            if (! is_file($path)) {
+                continue;
+            }
+
+            $partPaths[$index] = $path;
+            $totalSize += (int) filesize($path);
+        }
+
+        if ($totalSize > self::MAX_UPLOAD_KILOBYTES * 1024) {
+            File::delete([$assembledPath, $metaPath]);
+            File::deleteDirectory($partDirectory);
 
             return response()->json(['message' => 'Ukuran file melebihi batas 700 MB.'], 422);
         }
 
-        $meta['received_chunks'] = $chunkIndex + 1;
+        $meta['received_chunks'] = count($partPaths);
         file_put_contents($metaPath, json_encode($meta, JSON_THROW_ON_ERROR), LOCK_EX);
+
+        if ($meta['received_chunks'] === $totalChunks) {
+            $output = fopen($assembledPath, 'wb');
+
+            if ($output === false) {
+                return response()->json(['message' => 'Server gagal menyiapkan file hasil upload.'], 500);
+            }
+
+            try {
+                for ($index = 0; $index < $totalChunks; $index++) {
+                    $input = fopen($partPaths[$index], 'rb');
+
+                    if ($input === false) {
+                        return response()->json(['message' => "Bagian file ke-{$index} tidak dapat dibaca."], 500);
+                    }
+
+                    stream_copy_to_stream($input, $output);
+                    fclose($input);
+                }
+            } finally {
+                fclose($output);
+            }
+        }
 
         return response()->json([
             'completed' => $meta['received_chunks'] === $totalChunks,
@@ -335,7 +362,7 @@ class GeoJsonController extends Controller
                 UPLOAD_ERR_OK,
                 true,
             ),
-            [$partPath, $metaPath],
+            [$partPath, $metaPath, $directory.'/'.$uploadId],
         ];
     }
 

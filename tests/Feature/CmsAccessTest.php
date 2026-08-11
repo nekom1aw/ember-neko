@@ -589,4 +589,44 @@ class CmsAccessTest extends TestCase
         $this->assertSame('FeatureCollection', $layer->geojson_type);
         Storage::disk('public')->assertExists($layer->file_path);
     }
+
+    public function test_geojson_chunk_upload_accepts_out_of_order_parts_and_retries(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create();
+        $uploadId = 'ember-out-of-order-upload-123456';
+        $geojson = json_encode([
+            'type' => 'FeatureCollection',
+            'features' => [],
+        ], JSON_THROW_ON_ERROR);
+        $splitAt = (int) ceil(strlen($geojson) / 2);
+        $chunks = [substr($geojson, 0, $splitAt), substr($geojson, $splitAt)];
+
+        foreach ([1, 0, 1] as $index) {
+            $this->actingAs($admin)
+                ->postJson(route('cms.geojson.upload-chunk'), [
+                    'upload_id' => $uploadId,
+                    'chunk_index' => $index,
+                    'total_chunks' => count($chunks),
+                    'original_name' => 'kecamatan.geojson',
+                    'chunk' => UploadedFile::fake()->createWithContent('chunk.part', $chunks[$index]),
+                ])
+                ->assertOk();
+        }
+
+        $this->actingAs($admin)
+            ->post(route('cms.geojson.store'), [
+                'name' => 'Kecamatan Upload Acak',
+                'upload_token' => $uploadId,
+                'administrative_level' => 'district',
+                'min_zoom' => 6,
+                'max_zoom' => 13,
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('geojson_layers', [
+            'name' => 'Kecamatan Upload Acak',
+            'geojson_type' => 'FeatureCollection',
+        ]);
+    }
 }
